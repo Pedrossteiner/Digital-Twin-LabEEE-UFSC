@@ -1,0 +1,691 @@
+{
+  "links": [
+    {
+      "asDropdown": false,
+      "icon": "external link",
+      "includeVars": false,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": true,
+      "title": "Baixar dados",
+      "tooltip": "Baixar estes dados em Excel ou CSV",
+      "type": "link",
+      "url": "http://localhost:8090/"
+    },
+    {
+      "asDropdown": false,
+      "icon": "external link",
+      "includeVars": false,
+      "keepTime": false,
+      "tags": [],
+      "targetBlank": true,
+      "title": "Gêmeo 3D",
+      "tooltip": "Modelo 3D do lab com os sensores ao vivo",
+      "type": "link",
+      "url": "http://localhost:8090/gemeo3d"
+    }
+  ],
+  "panels": [
+    {
+      "gridPos": {
+        "h": 2,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 10,
+      "options": {
+        "content": "**Como ler:** cada PC das mesas do salão (36 no total) tem uma tomada inteligente. Quando o PC está ligado, ele conta como **posto ocupado**. As cores vão de cinza (vazio) a amarelo, laranja e vermelho (salão cheio). Dias úteis = segunda a sexta. **Atenção:** PC ligado não é garantia de pessoa sentada (alguém pode sair e deixar ligado), então os números mostram *uso dos postos*, não contagem de pessoas.",
+        "mode": "markdown"
+      },
+      "title": "",
+      "type": "text"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "influxdb"
+      },
+      "description": "PCs ligados neste momento.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "#FADE2A",
+            "mode": "fixed"
+          },
+          "decimals": 0,
+          "noValue": "–",
+          "unit": "suffix: de 36"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 2
+      },
+      "id": 1,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb"
+          },
+          "query": "from(bucket: \"LabEEE\")\n  |> range(start: -30m)\n  |> filter(fn: (r) => r._measurement == \"presenca\" and r._field == \"presente\")\n  |> group(columns: [\"pc\"]) |> last() |> group() |> sum()",
+          "refId": "A"
+        }
+      ],
+      "title": "Postos em uso agora",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "influxdb"
+      },
+      "description": "Maior número de PCs ligados simultaneamente no período escolhido (canto superior direito).",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "#FADE2A",
+            "mode": "fixed"
+          },
+          "decimals": 0,
+          "noValue": "–",
+          "unit": "suffix: de 36"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 2
+      },
+      "id": 2,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb"
+          },
+          "query": "import \"date\"\nimport \"timezone\"\noption location = timezone.location(name: \"America/Sao_Paulo\")\n// PCs em execução a cada 10 min (soma das tomadas Sonoff que responderam)\npcs = from(bucket: \"LabEEE\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"presenca\" and r._field == \"presente\")\n  |> group(columns: [\"pc\"])\n  |> aggregateWindow(every: 10m, fn: max, createEmpty: false)\n  |> group(columns: [\"_time\"])\n  |> sum()\n  |> group()\n\npcs |> max()",
+          "refId": "A"
+        }
+      ],
+      "title": "Máximo ao mesmo tempo",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "influxdb"
+      },
+      "description": "Média de PCs ligados de segunda a sexta, das 8h às 18h, no período escolhido.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "#FADE2A",
+            "mode": "fixed"
+          },
+          "decimals": 1,
+          "noValue": "–",
+          "unit": "suffix: de 36"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 2
+      },
+      "id": 3,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb"
+          },
+          "query": "import \"date\"\nimport \"timezone\"\noption location = timezone.location(name: \"America/Sao_Paulo\")\n// PCs em execução a cada 10 min (soma das tomadas Sonoff que responderam)\npcs = from(bucket: \"LabEEE\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"presenca\" and r._field == \"presente\")\n  |> group(columns: [\"pc\"])\n  |> aggregateWindow(every: 10m, fn: max, createEmpty: false)\n  |> group(columns: [\"_time\"])\n  |> sum()\n  |> group()\n\npcs |> filter(fn: (r) => date.hour(t: r._time) >= 8 and date.hour(t: r._time) < 18 and date.weekDay(t: r._time) >= 1 and date.weekDay(t: r._time) <= 5) |> mean()",
+          "refId": "A"
+        }
+      ],
+      "title": "Média num dia útil (8h–18h)",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "influxdb"
+      },
+      "description": "A mesma média, em porcentagem dos 36 postos.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "noValue": "–",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#3d4250",
+                "value": null
+              },
+              {
+                "color": "#FFF899",
+                "value": 5
+              },
+              {
+                "color": "#FADE2A",
+                "value": 15
+              },
+              {
+                "color": "#FF9830",
+                "value": 30
+              },
+              {
+                "color": "#F2495C",
+                "value": 50
+              },
+              {
+                "color": "#C4162A",
+                "value": 75
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 2
+      },
+      "id": 4,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb"
+          },
+          "query": "import \"date\"\nimport \"timezone\"\noption location = timezone.location(name: \"America/Sao_Paulo\")\n// PCs em execução a cada 10 min (soma das tomadas Sonoff que responderam)\npcs = from(bucket: \"LabEEE\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"presenca\" and r._field == \"presente\")\n  |> group(columns: [\"pc\"])\n  |> aggregateWindow(every: 10m, fn: max, createEmpty: false)\n  |> group(columns: [\"_time\"])\n  |> sum()\n  |> group()\n\npcs |> filter(fn: (r) => date.hour(t: r._time) >= 8 and date.hour(t: r._time) < 18 and date.weekDay(t: r._time) >= 1 and date.weekDay(t: r._time) <= 5) |> mean() |> map(fn: (r) => ({r with _value: r._value * 100.0 / 36.0}))",
+          "refId": "A"
+        }
+      ],
+      "title": "Ocupação média num dia útil",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "influxdb"
+      },
+      "description": "Cada célula é a média de postos ocupados naquele dia da semana e hora, no período escolhido. Célula vazia = ainda sem dado. O padrão fica confiável depois de 2–3 semanas de coleta.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "center",
+            "cellOptions": {
+              "mode": "basic",
+              "type": "color-background"
+            },
+            "minWidth": 50,
+            "width": 62
+          },
+          "decimals": 0,
+          "mappings": [
+            {
+              "options": {
+                "from": -1000,
+                "result": {
+                  "color": "transparent",
+                  "index": 0,
+                  "text": " "
+                },
+                "to": -0.5
+              },
+              "type": "range"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#3d4250",
+                "value": null
+              },
+              {
+                "color": "#FFF899",
+                "value": 5
+              },
+              {
+                "color": "#FADE2A",
+                "value": 15
+              },
+              {
+                "color": "#FF9830",
+                "value": 30
+              },
+              {
+                "color": "#F2495C",
+                "value": 50
+              },
+              {
+                "color": "#C4162A",
+                "value": 75
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "dia"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "auto"
+                }
+              },
+              {
+                "id": "custom.width",
+                "value": 110
+              },
+              {
+                "id": "displayName",
+                "value": "Dia"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 6
+      },
+      "id": 5,
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb"
+          },
+          "query": "import \"array\"\nimport \"date\"\nimport \"timezone\"\noption location = timezone.location(name: \"America/Sao_Paulo\")\n// PCs em execução a cada 10 min (soma das tomadas Sonoff que responderam)\npcs = from(bucket: \"LabEEE\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"presenca\" and r._field == \"presente\")\n  |> group(columns: [\"pc\"])\n  |> aggregateWindow(every: 10m, fn: max, createEmpty: false)\n  |> group(columns: [\"_time\"])\n  |> sum()\n  |> group()\n\n// média de PCs ligados por dia da semana e hora (6h–22h). Horário sem dado aparece vazio.\nmedia = pcs\n  |> filter(fn: (r) => date.hour(t: r._time) >= 6 and date.hour(t: r._time) <= 22)\n  |> map(fn: (r) => ({dn: date.weekDay(t: r._time), h: date.hour(t: r._time), v: float(v: r._value) * 100.0 / 36.0}))\n  |> group(columns: [\"dn\", \"h\"])\n  |> mean(column: \"v\")\n  |> group()\nvazio = array.from(rows: [{dn: 1, h: 6, v: -1.0},{dn: 1, h: 7, v: -1.0},{dn: 1, h: 8, v: -1.0},{dn: 1, h: 9, v: -1.0},{dn: 1, h: 10, v: -1.0},{dn: 1, h: 11, v: -1.0},{dn: 1, h: 12, v: -1.0},{dn: 1, h: 13, v: -1.0},{dn: 1, h: 14, v: -1.0},{dn: 1, h: 15, v: -1.0},{dn: 1, h: 16, v: -1.0},{dn: 1, h: 17, v: -1.0},{dn: 1, h: 18, v: -1.0},{dn: 1, h: 19, v: -1.0},{dn: 1, h: 20, v: -1.0},{dn: 1, h: 21, v: -1.0},{dn: 1, h: 22, v: -1.0}])\nsemana = union(tables: [\n  vazio |> map(fn: (r) => ({r with dn: 1})), vazio |> map(fn: (r) => ({r with dn: 2})), vazio |> map(fn: (r) => ({r with dn: 3})),\n  vazio |> map(fn: (r) => ({r with dn: 4})), vazio |> map(fn: (r) => ({r with dn: 5})), vazio |> map(fn: (r) => ({r with dn: 6})),\n  vazio |> map(fn: (r) => ({r with dn: 0}))])\nunion(tables: [media, semana])\n  |> group(columns: [\"dn\", \"h\"])\n  |> max(column: \"v\")\n  |> group()\n  |> map(fn: (r) => ({ordem: if r.dn == 0 then 7 else r.dn,\n      dia: if r.dn == 1 then \"Segunda\" else if r.dn == 2 then \"Terça\" else if r.dn == 3 then \"Quarta\" else if r.dn == 4 then \"Quinta\" else if r.dn == 5 then \"Sexta\" else if r.dn == 6 then \"Sábado\" else \"Domingo\",\n      hora: (if r.h < 10 then \"0\" else \"\") + string(v: r.h) + \"h\", v: r.v}))\n  |> pivot(rowKey: [\"ordem\", \"dia\"], columnKey: [\"hora\"], valueColumn: \"v\")\n  |> sort(columns: [\"ordem\"])\n  |> drop(columns: [\"ordem\"])",
+          "refId": "A"
+        }
+      ],
+      "title": "Quando o salão é usado? Ocupação média por dia da semana e hora (% dos 36 postos)",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "influxdb"
+      },
+      "description": "Média de segunda a sexta. Mostra os horários de pico e de vale do salão.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#3d4250",
+                "value": null
+              },
+              {
+                "color": "#FFF899",
+                "value": 5
+              },
+              {
+                "color": "#FADE2A",
+                "value": 15
+              },
+              {
+                "color": "#FF9830",
+                "value": 30
+              },
+              {
+                "color": "#F2495C",
+                "value": 50
+              },
+              {
+                "color": "#C4162A",
+                "value": 75
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 15
+      },
+      "id": 8,
+      "options": {
+        "barWidth": 0.8,
+        "legend": {
+          "showLegend": false
+        },
+        "showValue": "auto",
+        "tooltip": {
+          "mode": "single"
+        },
+        "xField": "Hora"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb"
+          },
+          "query": "import \"date\"\nimport \"timezone\"\noption location = timezone.location(name: \"America/Sao_Paulo\")\n// PCs em execução a cada 10 min (soma das tomadas Sonoff que responderam)\npcs = from(bucket: \"LabEEE\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"presenca\" and r._field == \"presente\")\n  |> group(columns: [\"pc\"])\n  |> aggregateWindow(every: 10m, fn: max, createEmpty: false)\n  |> group(columns: [\"_time\"])\n  |> sum()\n  |> group()\n\npcs\n  |> filter(fn: (r) => date.weekDay(t: r._time) >= 1 and date.weekDay(t: r._time) <= 5 and date.hour(t: r._time) >= 6 and date.hour(t: r._time) <= 22)\n  |> map(fn: (r) => ({h: date.hour(t: r._time), v: float(v: r._value) * 100.0 / 36.0}))\n  |> group(columns: [\"h\"])\n  |> mean(column: \"v\")\n  |> group()\n  |> sort(columns: [\"h\"])\n  |> map(fn: (r) => ({Hora: (if r.h < 10 then \"0\" else \"\") + string(v: r.h) + \"h\", \"Ocupação média\": r.v}))",
+          "refId": "A"
+        }
+      ],
+      "title": "Um dia útil típico: ocupação média por hora",
+      "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "influxdb"
+      },
+      "description": "Porcentagem do tempo em que os PCs de cada bancada ficaram ligados. As bancadas têm tamanhos diferentes (8 ou 6 mesas), por isso a comparação é em %.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "displayName": "${__data.fields.bancada}",
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#3d4250",
+                "value": null
+              },
+              {
+                "color": "#FFF899",
+                "value": 5
+              },
+              {
+                "color": "#FADE2A",
+                "value": 15
+              },
+              {
+                "color": "#FF9830",
+                "value": 30
+              },
+              {
+                "color": "#F2495C",
+                "value": 50
+              },
+              {
+                "color": "#C4162A",
+                "value": 75
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 15
+      },
+      "id": 7,
+      "options": {
+        "displayMode": "basic",
+        "minVizHeight": 16,
+        "namePlacement": "top",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        },
+        "showUnfilled": true,
+        "valueMode": "color"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb"
+          },
+          "query": "import \"date\"\nimport \"timezone\"\noption location = timezone.location(name: \"America/Sao_Paulo\")\n// PCs em execução a cada 10 min (soma das tomadas Sonoff que responderam)\n\n// porcentagem do tempo em que os PCs de cada bancada ficaram ligados\nfrom(bucket: \"LabEEE\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"presenca\" and r._field == \"presente\")\n  |> filter(fn: (r) => date.hour(t: r._time) >= 8 and date.hour(t: r._time) < 18 and date.weekDay(t: r._time) >= 1 and date.weekDay(t: r._time) <= 5)\n  |> map(fn: (r) => ({r with n: int(v: r.pc)}))\n  |> map(fn: (r) => ({_value: float(v: r._value) * 100.0,\n      bancada: if (r.n >= 11 and r.n <= 14) or (r.n >= 21 and r.n <= 24) then \"Mesas 11–14 e 21–24\"\n        else if (r.n >= 15 and r.n <= 17) or (r.n >= 25 and r.n <= 27) then \"Mesas 15–17 e 25–27\"\n        else if (r.n >= 31 and r.n <= 34) or (r.n >= 41 and r.n <= 44) then \"Mesas 31–34 e 41–44\"\n        else if (r.n >= 35 and r.n <= 37) or (r.n >= 45 and r.n <= 47) then \"Mesas 35–37 e 45–47\"\n        else \"Mesas 51–54 e 61–64\"}))\n  |> group(columns: [\"bancada\"])\n  |> mean()\n  |> group()\n  |> sort(columns: [\"bancada\"])",
+          "refId": "A"
+        }
+      ],
+      "title": "Uso por bancada (dias úteis, 8h–18h)",
+      "type": "bargauge"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "influxdb"
+      },
+      "description": "Amarelo (eixo da esquerda): PCs ligados. Verde (eixo da direita): média dos 5 sensores de CO₂. Se o CO₂ sobe junto com a ocupação, a ventilação não está dando conta.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "spanNulls": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "A"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "PCs em execução"
+              },
+              {
+                "id": "custom.lineInterpolation",
+                "value": "stepAfter"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#FADE2A",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "PCs"
+              },
+              {
+                "id": "min",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "B"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "CO₂ médio (ppm)"
+              },
+              {
+                "id": "unit",
+                "value": "ppm"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#73BF69",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 0
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 24
+      },
+      "id": 6,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb"
+          },
+          "query": "import \"date\"\nimport \"timezone\"\noption location = timezone.location(name: \"America/Sao_Paulo\")\n// PCs em execução a cada 10 min (soma das tomadas Sonoff que responderam)\npcs = from(bucket: \"LabEEE\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"presenca\" and r._field == \"presente\")\n  |> group(columns: [\"pc\"])\n  |> aggregateWindow(every: 10m, fn: max, createEmpty: false)\n  |> group(columns: [\"_time\"])\n  |> sum()\n  |> group()\n\npcs |> map(fn: (r) => ({_time: r._time, _value: r._value, _field: \"PCs em execução\"}))",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb"
+          },
+          "query": "from(bucket: \"LabEEE\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"ambiente\" and r._field == \"co2_ppm\")\n  |> group(columns: [\"serie\"])\n  |> aggregateWindow(every: 10m, fn: mean, createEmpty: false)\n  |> group(columns: [\"_time\"])\n  |> mean()\n  |> group()\n  |> map(fn: (r) => ({_time: r._time, _value: r._value, _field: \"CO₂ médio do salão\"}))",
+          "refId": "B"
+        }
+      ],
+      "timeFrom": "7d",
+      "title": "Últimos 7 dias: postos em uso × CO₂ do salão",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "5m",
+  "schemaVersion": 39,
+  "tags": [
+    "gemeo-digital",
+    "labeee"
+  ],
+  "time": {
+    "from": "now-30d",
+    "to": "now"
+  },
+  "timezone": "browser",
+  "title": "LabEEE — Ocupação",
+  "uid": "labeee-ocupacao"
+}

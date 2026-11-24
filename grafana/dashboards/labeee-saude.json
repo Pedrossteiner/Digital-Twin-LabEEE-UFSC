@@ -1,0 +1,453 @@
+{
+  "links": [
+    {
+      "asDropdown": false,
+      "icon": "external link",
+      "includeVars": false,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": true,
+      "title": "Baixar dados",
+      "tooltip": "Baixar estes dados em Excel ou CSV",
+      "type": "link",
+      "url": "http://localhost:8090/"
+    },
+    {
+      "asDropdown": false,
+      "icon": "external link",
+      "includeVars": false,
+      "keepTime": false,
+      "tags": [],
+      "targetBlank": true,
+      "title": "Gêmeo 3D",
+      "tooltip": "Modelo 3D do lab com os sensores ao vivo",
+      "type": "link",
+      "url": "http://localhost:8090/gemeo3d"
+    }
+  ],
+  "panels": [
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "influxdb"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "left"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Último dado (min atrás)"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "m"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 15
+                    },
+                    {
+                      "color": "red",
+                      "value": 30
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "mode": "basic",
+                  "type": "color-background"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb"
+          },
+          "query": "import \"array\"\n// Minutos desde o último dado de cada fonte. Mais de 30 min = algo parou (HA, MQTT ou Telegraf).\nfontes = array.from(rows: [\n  {m: \"ambiente\", fonte: \"HOBO (temperatura / CO₂)\"},\n  {m: \"zigbee\", fonte: \"Sensores Zigbee (janelas)\"},\n  {m: \"janela\", fonte: \"Janelas (estado a cada 10 min)\"},\n  {m: \"presenca\", fonte: \"Presença dos PCs\"},\n  {m: \"daikin\", fonte: \"Ar-condicionado Daikin\"}])\nultimo = from(bucket: \"LabEEE\")\n  |> range(start: -30d)\n  |> filter(fn: (r) => (r._measurement == \"ambiente\" and r._field == \"temp_c\") or (r._measurement == \"zigbee\" and r._field == \"linkquality\") or (r._measurement == \"janela\" and r._field == \"aberta\") or (r._measurement == \"presenca\" and r._field == \"presente\") or (r._measurement == \"daikin\" and r._field == \"ligado\"))\n  |> group(columns: [\"_measurement\"])\n  |> last()\n  |> group()\n  |> map(fn: (r) => ({m: r._measurement, min: float(v: int(v: now()) - int(v: r._time)) / 60000000000.0}))\njoin(tables: {f: fontes, u: ultimo}, on: [\"m\"], method: \"inner\") |> keep(columns: [\"fonte\", \"min\"]) |> sort(columns: [\"fonte\"])",
+          "refId": "A"
+        }
+      ],
+      "title": "Minutos desde o último dado, por fonte",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "fonte": "Fonte",
+              "min": "Último dado (min atrás)"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "influxdb"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "noValue": "0",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 4,
+        "x": 12,
+        "y": 0
+      },
+      "id": 2,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb"
+          },
+          "query": "import \"strings\"\nfrom(bucket: \"LabEEE\")\n  |> range(start: -30d)\n  |> filter(fn: (r) => r._measurement == \"zigbee_disponibilidade\")\n  |> group(columns: [\"topic\"]) |> last() |> group()\n  |> filter(fn: (r) => r.topic !~ /0x/)\n  |> filter(fn: (r) => strings.containsStr(v: string(v: r._value), substr: \"offline\"))\n  |> map(fn: (r) => ({sensor: strings.trimSuffix(v: strings.trimPrefix(v: r.topic, prefix: \"zigbee2mqtt/\"), suffix: \"/availability\"), desde: r._time}))\n  |> count(column: \"sensor\")",
+          "refId": "A"
+        }
+      ],
+      "title": "Sensores Zigbee offline",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "influxdb"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 0
+      },
+      "id": 3,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb"
+          },
+          "query": "import \"strings\"\nfrom(bucket: \"LabEEE\")\n  |> range(start: -30d)\n  |> filter(fn: (r) => r._measurement == \"zigbee_disponibilidade\")\n  |> group(columns: [\"topic\"]) |> last() |> group()\n  |> filter(fn: (r) => r.topic !~ /0x/)\n  |> filter(fn: (r) => strings.containsStr(v: string(v: r._value), substr: \"offline\"))\n  |> map(fn: (r) => ({sensor: strings.trimSuffix(v: strings.trimPrefix(v: r.topic, prefix: \"zigbee2mqtt/\"), suffix: \"/availability\"), desde: r._time}))",
+          "refId": "A"
+        }
+      ],
+      "title": "Zigbee offline (zigbee2mqtt)",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "indexByName": {
+              "desde": 1,
+              "sensor": 0
+            },
+            "renameByName": {
+              "desde": "Offline desde",
+              "sensor": "Sensor"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "influxdb"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Último dado (min atrás)"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "m"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 20
+                    },
+                    {
+                      "color": "red",
+                      "value": 60
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "mode": "basic",
+                  "type": "color-background"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 12,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "id": 4,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb"
+          },
+          "query": "from(bucket: \"LabEEE\")\n  |> range(start: -30d)\n  |> filter(fn: (r) => r._measurement == \"ambiente\" and r._field == \"temp_c\")\n  |> group(columns: [\"serie\"]) |> last() |> group()\n  |> map(fn: (r) => ({serie: r.serie, min: float(v: int(v: now()) - int(v: r._time)) / 60000000000.0}))\n  |> sort(columns: [\"min\"], desc: true)",
+          "refId": "A"
+        }
+      ],
+      "title": "HOBO: minutos desde o último dado (cada um manda a cada ~10 min)",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "indexByName": {
+              "min": 1,
+              "serie": 0
+            },
+            "renameByName": {
+              "min": "Último dado (min atrás)",
+              "serie": "Série"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "influxdb"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Bateria"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 20
+                    },
+                    {
+                      "color": "green",
+                      "value": 40
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "mode": "basic",
+                  "type": "gauge",
+                  "valueDisplayMode": "text"
+                }
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "max",
+                "value": 100
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 12,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "id": 5,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb"
+          },
+          "query": "import \"strings\"\nfrom(bucket: \"LabEEE\")\n  |> range(start: -2d)\n  |> filter(fn: (r) => r._measurement == \"zigbee\" and r._field == \"battery\")\n  |> filter(fn: (r) => r.topic !~ /0x/)\n  |> group(columns: [\"topic\"]) |> last() |> group()\n  |> map(fn: (r) => ({sensor: strings.trimPrefix(v: r.topic, prefix: \"zigbee2mqtt/\"), bateria: float(v: r._value), visto: r._time}))\n  |> sort(columns: [\"bateria\"])",
+          "refId": "A"
+        }
+      ],
+      "title": "Bateria dos sensores Zigbee",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "indexByName": {
+              "bateria": 1,
+              "sensor": 0,
+              "visto": 2
+            },
+            "renameByName": {
+              "bateria": "Bateria",
+              "sensor": "Sensor",
+              "visto": "Última mensagem"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    }
+  ],
+  "refresh": "1m",
+  "schemaVersion": 39,
+  "tags": [
+    "gemeo-digital",
+    "labeee"
+  ],
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "timezone": "browser",
+  "title": "LabEEE — Saúde da coleta",
+  "uid": "labeee-saude"
+}

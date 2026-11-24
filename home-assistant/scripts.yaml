@@ -1,0 +1,37 @@
+toggle_generate_file:
+  alias: Ativar e Desativar Gerar Arquivo
+  sequence:
+  - service: input_boolean.turn_on
+    target:
+      entity_id: input_boolean.generate_file
+  - delay: 00:00:01
+  - service: input_boolean.turn_off
+    target:
+      entity_id: input_boolean.generate_file
+notify_slack_notification_template:
+  alias: 'Notify: Slack Notification Template'
+  sequence:
+  - data:
+      message: Fallback Text
+      target: '#teste_bot'
+      title: Reminder
+      data:
+        blocks:
+        - type: section
+          text:
+            type: mrkdwn
+            text: This is a mrkdwn section block *this is bold*, and ~this is crossed
+              out~, and <https://google.com|this is a link>
+    action: notify.labeee
+  mode: single
+slack_notificar_indisponivel_daikin:
+  sequence:
+  - data:
+      message: '⚠️ Atenção: O Ar Condicionado Daikin ficou indisponível!'
+      title: Falha no Sistema Daikin
+      target:
+      - SLACK_ID_PESSOA_2
+      - SLACK_ID_PESSOA_1
+    action: notify.labeee
+  alias: 'Slack: Notificar Daikin Indisponivel '
+  description: ''

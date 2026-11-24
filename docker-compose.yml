@@ -1,0 +1,61 @@
+# Produção: InfluxDB + Grafana + Telegraf (lê o MQTT do Home Assistant) + portal de dados e Gêmeo 3D.
+# Senhas e endereços ficam no .env (veja .env.example).
+services:
+  influxdb:
+    image: influxdb:2.7
+    container_name: influxdb_sensor_data
+    ports:
+      - "8086:8086"
+    volumes:
+      - influx_data:/var/lib/influxdb2
+      - influx_config:/etc/influxdb2
+    restart: always
+
+  grafana:
+    image: grafana/grafana:13.2.1
+    container_name: grafana_dashboard
+    environment:
+      - GF_PLUGINS_PREINSTALL=nline-plotlyjs-panel@1.8.1
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    restart: always
+    depends_on:
+      - influxdb
+
+  telegraf:
+    image: telegraf:latest
+    container_name: telegraf
+    env_file: .env
+    restart: always
+    volumes:
+      - ./telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro
+    depends_on:
+      - influxdb
+
+  dados:
+    build: ./portal-dados
+    container_name: portal_dados
+    restart: always
+    environment:
+      - DADOS_INFLUX_TOKEN=${DADOS_INFLUX_TOKEN}
+      - INFLUX_URL=http://influxdb:8086
+      - INFLUX_ORG=LabEEE
+      - INFLUX_BUCKET=LabEEE
+      - GRAFANA_URL=http://grafana:3000
+      - GRAFANA_PUBLICO=${GRAFANA_PUBLICO}
+      - PRIMEIRO_MES=2026-11
+    ports:
+      - "8090:8000"
+    volumes:
+      - dados_mensais:/dados_mensais
+    depends_on:
+      - influxdb
+      - grafana
+
+volumes:
+  influx_data:
+  influx_config:
+  grafana_data:
+  dados_mensais:

@@ -1,0 +1,385 @@
+{
+  "links": [
+    {
+      "asDropdown": false,
+      "icon": "external link",
+      "includeVars": false,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": true,
+      "title": "Baixar dados",
+      "tooltip": "Baixar estes dados em Excel ou CSV",
+      "type": "link",
+      "url": "http://localhost:8090/"
+    },
+    {
+      "asDropdown": false,
+      "icon": "external link",
+      "includeVars": false,
+      "keepTime": false,
+      "tags": [],
+      "targetBlank": true,
+      "title": "Gêmeo 3D",
+      "tooltip": "Modelo 3D do lab com os sensores ao vivo",
+      "type": "link",
+      "url": "http://localhost:8090/gemeo3d"
+    }
+  ],
+  "panels": [
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "influxdb"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "mappings": [],
+          "noValue": "0",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 5
+              }
+            ]
+          },
+          "unit": "m"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      },
+      "hideTimeOverride": false,
+      "id": 1,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb"
+          },
+          "query": "import \"date\"\n// Estado do lab em passos de 5 min: ares-condicionados ligados, janelas/portas do salão abertas e PCs em execução.\n// Cada passo de 5 min com ar ligado + janela aberta (ou ar ligado + nenhum PC) conta 5 min de desperdício.\nimport \"timezone\"\noption location = timezone.location(name: \"America/Sao_Paulo\")\ninicio = date.sub(d: 1d, from: v.timeRangeStart)\n// Só os 5 ares-condicionados do salão. Zonas (ar -> mesas): 1-04: 11–14/21–24, 1-06: 15–17/25–27,\n// 1-03: 31–34/41–44, 1-05: 35–37/45–47, 1-02: 51–54/61–64.\narz = from(bucket: \"LabEEE\")\n  |> range(start: inicio, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"daikin\" and r._field == \"ligado\" and r.unidade =~ /^1_0[2-6]$/)\n  |> group(columns: [\"unidade\"])\n  |> aggregateWindow(every: 5m, fn: max, createEmpty: true)\n  |> fill(usePrevious: true) |> fill(value: 0.0)\n  |> map(fn: (r) => ({_time: r._time, zona: r.unidade, ar: float(v: r._value)}))\n  |> group()\npcz = from(bucket: \"LabEEE\")\n  |> range(start: inicio, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"presenca\" and r._field == \"presente\")\n  |> group(columns: [\"pc\"])\n  |> aggregateWindow(every: 5m, fn: max, createEmpty: true)\n  |> fill(usePrevious: true) |> fill(value: 0.0)\n  |> map(fn: (r) => ({_time: r._time, _value: float(v: r._value),\n      zona: if r.pc =~ /^[12][1-4]$/ then \"1_04\" else if r.pc =~ /^[12][5-7]$/ then \"1_06\"\n       else if r.pc =~ /^[34][1-4]$/ then \"1_03\" else if r.pc =~ /^[34][5-7]$/ then \"1_05\" else \"1_02\"}))\n  |> group(columns: [\"_time\", \"zona\"]) |> sum() |> group()\n  |> map(fn: (r) => ({_time: r._time, zona: r.zona, pcs: r._value}))\n// Por passo de 5 min: ares do salão ligados, PCs do salão e quantas zonas têm ar ligado sem nenhum PC.\nzonas = join(tables: {a: arz, p: pcz}, on: [\"_time\", \"zona\"])\n  |> map(fn: (r) => ({_time: r._time, ar: r.ar, pcs: r.pcs, vazio: if r.ar > 0.0 and r.pcs == 0.0 then 1.0 else 0.0}))\n  |> group(columns: [\"_time\"])\n  |> reduce(identity: {ar: 0.0, pcs: 0.0, vazio: 0.0}, fn: (r, accumulator) => ({ar: accumulator.ar + r.ar, pcs: accumulator.pcs + r.pcs, vazio: accumulator.vazio + r.vazio}))\n  |> group()\njanelas = from(bucket: \"LabEEE\")\n  |> range(start: inicio, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"janela\" and r._field == \"aberta\")\n  |> filter(fn: (r) => r.nome =~ /^(1[0-2]|[1-9])A$/ or r.nome =~ /^[1-9]B$/)\n  |> group(columns: [\"nome\"])\n  |> aggregateWindow(every: 5m, fn: last, createEmpty: true)\n  |> fill(usePrevious: true) |> fill(value: 0.0)\n  |> group(columns: [\"_time\"]) |> sum() |> group()\n  |> map(fn: (r) => ({_time: r._time, jan: r._value}))\nestado = join(tables: {z: zonas, j: janelas}, on: [\"_time\"])\n  |> filter(fn: (r) => r._time >= v.timeRangeStart)\n  |> map(fn: (r) => ({_time: r._time,\n      ar_janela: if r.ar > 0.0 and r.jan > 0.0 then 5.0 else 0.0,\n      ar_vazio: if r.vazio > 0.0 then 5.0 else 0.0,\n      ar: r.ar, jan: r.jan, pcs: r.pcs}))estado |> sum(column: \"ar_janela\") |> map(fn: (r) => ({_value: r.ar_janela}))",
+          "refId": "A"
+        }
+      ],
+      "timeFrom": "now/d",
+      "title": "Hoje: ar ligado com janela aberta",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "influxdb"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "mappings": [],
+          "noValue": "0",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 5
+              }
+            ]
+          },
+          "unit": "m"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 6,
+        "y": 0
+      },
+      "hideTimeOverride": false,
+      "id": 2,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb"
+          },
+          "query": "import \"date\"\n// Estado do lab em passos de 5 min: ares-condicionados ligados, janelas/portas do salão abertas e PCs em execução.\n// Cada passo de 5 min com ar ligado + janela aberta (ou ar ligado + nenhum PC) conta 5 min de desperdício.\nimport \"timezone\"\noption location = timezone.location(name: \"America/Sao_Paulo\")\ninicio = date.sub(d: 1d, from: v.timeRangeStart)\n// Só os 5 ares-condicionados do salão. Zonas (ar -> mesas): 1-04: 11–14/21–24, 1-06: 15–17/25–27,\n// 1-03: 31–34/41–44, 1-05: 35–37/45–47, 1-02: 51–54/61–64.\narz = from(bucket: \"LabEEE\")\n  |> range(start: inicio, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"daikin\" and r._field == \"ligado\" and r.unidade =~ /^1_0[2-6]$/)\n  |> group(columns: [\"unidade\"])\n  |> aggregateWindow(every: 5m, fn: max, createEmpty: true)\n  |> fill(usePrevious: true) |> fill(value: 0.0)\n  |> map(fn: (r) => ({_time: r._time, zona: r.unidade, ar: float(v: r._value)}))\n  |> group()\npcz = from(bucket: \"LabEEE\")\n  |> range(start: inicio, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"presenca\" and r._field == \"presente\")\n  |> group(columns: [\"pc\"])\n  |> aggregateWindow(every: 5m, fn: max, createEmpty: true)\n  |> fill(usePrevious: true) |> fill(value: 0.0)\n  |> map(fn: (r) => ({_time: r._time, _value: float(v: r._value),\n      zona: if r.pc =~ /^[12][1-4]$/ then \"1_04\" else if r.pc =~ /^[12][5-7]$/ then \"1_06\"\n       else if r.pc =~ /^[34][1-4]$/ then \"1_03\" else if r.pc =~ /^[34][5-7]$/ then \"1_05\" else \"1_02\"}))\n  |> group(columns: [\"_time\", \"zona\"]) |> sum() |> group()\n  |> map(fn: (r) => ({_time: r._time, zona: r.zona, pcs: r._value}))\n// Por passo de 5 min: ares do salão ligados, PCs do salão e quantas zonas têm ar ligado sem nenhum PC.\nzonas = join(tables: {a: arz, p: pcz}, on: [\"_time\", \"zona\"])\n  |> map(fn: (r) => ({_time: r._time, ar: r.ar, pcs: r.pcs, vazio: if r.ar > 0.0 and r.pcs == 0.0 then 1.0 else 0.0}))\n  |> group(columns: [\"_time\"])\n  |> reduce(identity: {ar: 0.0, pcs: 0.0, vazio: 0.0}, fn: (r, accumulator) => ({ar: accumulator.ar + r.ar, pcs: accumulator.pcs + r.pcs, vazio: accumulator.vazio + r.vazio}))\n  |> group()\njanelas = from(bucket: \"LabEEE\")\n  |> range(start: inicio, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"janela\" and r._field == \"aberta\")\n  |> filter(fn: (r) => r.nome =~ /^(1[0-2]|[1-9])A$/ or r.nome =~ /^[1-9]B$/)\n  |> group(columns: [\"nome\"])\n  |> aggregateWindow(every: 5m, fn: last, createEmpty: true)\n  |> fill(usePrevious: true) |> fill(value: 0.0)\n  |> group(columns: [\"_time\"]) |> sum() |> group()\n  |> map(fn: (r) => ({_time: r._time, jan: r._value}))\nestado = join(tables: {z: zonas, j: janelas}, on: [\"_time\"])\n  |> filter(fn: (r) => r._time >= v.timeRangeStart)\n  |> map(fn: (r) => ({_time: r._time,\n      ar_janela: if r.ar > 0.0 and r.jan > 0.0 then 5.0 else 0.0,\n      ar_vazio: if r.vazio > 0.0 then 5.0 else 0.0,\n      ar: r.ar, jan: r.jan, pcs: r.pcs}))estado |> sum(column: \"ar_vazio\") |> map(fn: (r) => ({_value: r.ar_vazio}))",
+          "refId": "A"
+        }
+      ],
+      "timeFrom": "now/d",
+      "title": "Hoje: ar ligado sem ninguém",
+      "type": "stat"
+    },
+    {
+      "gridPos": {
+        "h": 5,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "id": 3,
+      "options": {
+        "content": "A cada 5 min o painel olha o salão: quais dos **5 ares-condicionados do salão** (1-02 a 1-06) estão ligados, quantas janelas e portas do salão (1A–12A, 1B–9B) estão abertas e quais PCs estão em execução. Os ares das salas de reunião e das salas do Lamberts e da Ana Paula não entram.\n\n- **Ar + janela**: algum ar do salão ligado e alguma janela/porta do salão aberta.\n- **Ar sem ninguém**: algum ar do salão ligado e **nenhum PC da zona dele** em execução (1-04: mesas 11–14/21–24 · 1-06: 15–17/25–27 · 1-03: 31–34/41–44 · 1-05: 35–37/45–47 · 1-02: 51–54/61–64).\n\nCada passo de 5 min em que isso acontece conta 5 min (mesmo que duas zonas estejam vazias ao mesmo tempo). Os alertas no Home Assistant e no Slack usam as mesmas regras: ar + janela depois de 10 min seguidos e ar sem ninguém depois de 20 min.",
+        "mode": "markdown"
+      },
+      "title": "Como é calculado",
+      "type": "text"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "influxdb"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "decimals": 0,
+          "unit": "m"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "A"
+            },
+            "properties": []
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*janela.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "orange",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*ninguém.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 5
+      },
+      "id": 4,
+      "options": {
+        "barWidth": 0.9,
+        "groupWidth": 0.7,
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "showValue": "auto",
+        "stacking": "none",
+        "xField": "Time",
+        "xTickLabelRotation": 0
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb"
+          },
+          "query": "import \"date\"\n// Estado do lab em passos de 5 min: ares-condicionados ligados, janelas/portas do salão abertas e PCs em execução.\n// Cada passo de 5 min com ar ligado + janela aberta (ou ar ligado + nenhum PC) conta 5 min de desperdício.\nimport \"timezone\"\noption location = timezone.location(name: \"America/Sao_Paulo\")\ninicio = date.sub(d: 1d, from: v.timeRangeStart)\n// Só os 5 ares-condicionados do salão. Zonas (ar -> mesas): 1-04: 11–14/21–24, 1-06: 15–17/25–27,\n// 1-03: 31–34/41–44, 1-05: 35–37/45–47, 1-02: 51–54/61–64.\narz = from(bucket: \"LabEEE\")\n  |> range(start: inicio, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"daikin\" and r._field == \"ligado\" and r.unidade =~ /^1_0[2-6]$/)\n  |> group(columns: [\"unidade\"])\n  |> aggregateWindow(every: 5m, fn: max, createEmpty: true)\n  |> fill(usePrevious: true) |> fill(value: 0.0)\n  |> map(fn: (r) => ({_time: r._time, zona: r.unidade, ar: float(v: r._value)}))\n  |> group()\npcz = from(bucket: \"LabEEE\")\n  |> range(start: inicio, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"presenca\" and r._field == \"presente\")\n  |> group(columns: [\"pc\"])\n  |> aggregateWindow(every: 5m, fn: max, createEmpty: true)\n  |> fill(usePrevious: true) |> fill(value: 0.0)\n  |> map(fn: (r) => ({_time: r._time, _value: float(v: r._value),\n      zona: if r.pc =~ /^[12][1-4]$/ then \"1_04\" else if r.pc =~ /^[12][5-7]$/ then \"1_06\"\n       else if r.pc =~ /^[34][1-4]$/ then \"1_03\" else if r.pc =~ /^[34][5-7]$/ then \"1_05\" else \"1_02\"}))\n  |> group(columns: [\"_time\", \"zona\"]) |> sum() |> group()\n  |> map(fn: (r) => ({_time: r._time, zona: r.zona, pcs: r._value}))\n// Por passo de 5 min: ares do salão ligados, PCs do salão e quantas zonas têm ar ligado sem nenhum PC.\nzonas = join(tables: {a: arz, p: pcz}, on: [\"_time\", \"zona\"])\n  |> map(fn: (r) => ({_time: r._time, ar: r.ar, pcs: r.pcs, vazio: if r.ar > 0.0 and r.pcs == 0.0 then 1.0 else 0.0}))\n  |> group(columns: [\"_time\"])\n  |> reduce(identity: {ar: 0.0, pcs: 0.0, vazio: 0.0}, fn: (r, accumulator) => ({ar: accumulator.ar + r.ar, pcs: accumulator.pcs + r.pcs, vazio: accumulator.vazio + r.vazio}))\n  |> group()\njanelas = from(bucket: \"LabEEE\")\n  |> range(start: inicio, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"janela\" and r._field == \"aberta\")\n  |> filter(fn: (r) => r.nome =~ /^(1[0-2]|[1-9])A$/ or r.nome =~ /^[1-9]B$/)\n  |> group(columns: [\"nome\"])\n  |> aggregateWindow(every: 5m, fn: last, createEmpty: true)\n  |> fill(usePrevious: true) |> fill(value: 0.0)\n  |> group(columns: [\"_time\"]) |> sum() |> group()\n  |> map(fn: (r) => ({_time: r._time, jan: r._value}))\nestado = join(tables: {z: zonas, j: janelas}, on: [\"_time\"])\n  |> filter(fn: (r) => r._time >= v.timeRangeStart)\n  |> map(fn: (r) => ({_time: r._time,\n      ar_janela: if r.ar > 0.0 and r.jan > 0.0 then 5.0 else 0.0,\n      ar_vazio: if r.vazio > 0.0 then 5.0 else 0.0,\n      ar: r.ar, jan: r.jan, pcs: r.pcs}))\nunion(tables: [\n  estado |> map(fn: (r) => ({_time: r._time, _value: r.ar_janela, _field: \"Ar ligado com janela aberta\"})),\n  estado |> map(fn: (r) => ({_time: r._time, _value: r.ar_vazio, _field: \"Ar ligado sem ninguém\"}))\n]) |> group(columns: [\"_field\"])\n  |> aggregateWindow(every: 1d, fn: sum, createEmpty: true, timeSrc: \"_start\") |> fill(value: 0.0)",
+          "refId": "A"
+        }
+      ],
+      "timeFrom": "7d",
+      "title": "Minutos de desperdício por dia (últimos 7 dias)",
+      "transformations": [
+        {
+          "id": "joinByField",
+          "options": {
+            "byField": "Time",
+            "mode": "outer"
+          }
+        },
+        {
+          "id": "formatTime",
+          "options": {
+            "outputFormat": "DD/MM",
+            "timeField": "Time",
+            "useTimezone": true
+          }
+        }
+      ],
+      "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "influxdb"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 8,
+            "lineInterpolation": "stepAfter",
+            "lineWidth": 2
+          },
+          "decimals": 0,
+          "displayName": "${__field.labels._field}"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "Ares.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#5794F2",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "Janelas.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "orange",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "PCs.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#FADE2A",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 15
+      },
+      "id": 5,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb"
+          },
+          "query": "import \"date\"\n// Estado do lab em passos de 5 min: ares-condicionados ligados, janelas/portas do salão abertas e PCs em execução.\n// Cada passo de 5 min com ar ligado + janela aberta (ou ar ligado + nenhum PC) conta 5 min de desperdício.\nimport \"timezone\"\noption location = timezone.location(name: \"America/Sao_Paulo\")\ninicio = date.sub(d: 1d, from: v.timeRangeStart)\n// Só os 5 ares-condicionados do salão. Zonas (ar -> mesas): 1-04: 11–14/21–24, 1-06: 15–17/25–27,\n// 1-03: 31–34/41–44, 1-05: 35–37/45–47, 1-02: 51–54/61–64.\narz = from(bucket: \"LabEEE\")\n  |> range(start: inicio, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"daikin\" and r._field == \"ligado\" and r.unidade =~ /^1_0[2-6]$/)\n  |> group(columns: [\"unidade\"])\n  |> aggregateWindow(every: 5m, fn: max, createEmpty: true)\n  |> fill(usePrevious: true) |> fill(value: 0.0)\n  |> map(fn: (r) => ({_time: r._time, zona: r.unidade, ar: float(v: r._value)}))\n  |> group()\npcz = from(bucket: \"LabEEE\")\n  |> range(start: inicio, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"presenca\" and r._field == \"presente\")\n  |> group(columns: [\"pc\"])\n  |> aggregateWindow(every: 5m, fn: max, createEmpty: true)\n  |> fill(usePrevious: true) |> fill(value: 0.0)\n  |> map(fn: (r) => ({_time: r._time, _value: float(v: r._value),\n      zona: if r.pc =~ /^[12][1-4]$/ then \"1_04\" else if r.pc =~ /^[12][5-7]$/ then \"1_06\"\n       else if r.pc =~ /^[34][1-4]$/ then \"1_03\" else if r.pc =~ /^[34][5-7]$/ then \"1_05\" else \"1_02\"}))\n  |> group(columns: [\"_time\", \"zona\"]) |> sum() |> group()\n  |> map(fn: (r) => ({_time: r._time, zona: r.zona, pcs: r._value}))\n// Por passo de 5 min: ares do salão ligados, PCs do salão e quantas zonas têm ar ligado sem nenhum PC.\nzonas = join(tables: {a: arz, p: pcz}, on: [\"_time\", \"zona\"])\n  |> map(fn: (r) => ({_time: r._time, ar: r.ar, pcs: r.pcs, vazio: if r.ar > 0.0 and r.pcs == 0.0 then 1.0 else 0.0}))\n  |> group(columns: [\"_time\"])\n  |> reduce(identity: {ar: 0.0, pcs: 0.0, vazio: 0.0}, fn: (r, accumulator) => ({ar: accumulator.ar + r.ar, pcs: accumulator.pcs + r.pcs, vazio: accumulator.vazio + r.vazio}))\n  |> group()\njanelas = from(bucket: \"LabEEE\")\n  |> range(start: inicio, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"janela\" and r._field == \"aberta\")\n  |> filter(fn: (r) => r.nome =~ /^(1[0-2]|[1-9])A$/ or r.nome =~ /^[1-9]B$/)\n  |> group(columns: [\"nome\"])\n  |> aggregateWindow(every: 5m, fn: last, createEmpty: true)\n  |> fill(usePrevious: true) |> fill(value: 0.0)\n  |> group(columns: [\"_time\"]) |> sum() |> group()\n  |> map(fn: (r) => ({_time: r._time, jan: r._value}))\nestado = join(tables: {z: zonas, j: janelas}, on: [\"_time\"])\n  |> filter(fn: (r) => r._time >= v.timeRangeStart)\n  |> map(fn: (r) => ({_time: r._time,\n      ar_janela: if r.ar > 0.0 and r.jan > 0.0 then 5.0 else 0.0,\n      ar_vazio: if r.vazio > 0.0 then 5.0 else 0.0,\n      ar: r.ar, jan: r.jan, pcs: r.pcs}))\nunion(tables: [\n  estado |> map(fn: (r) => ({_time: r._time, _value: r.ar, _field: \"Ares-condicionados do salão ligados\"})),\n  estado |> map(fn: (r) => ({_time: r._time, _value: r.jan, _field: \"Janelas/portas abertas\"})),\n  estado |> map(fn: (r) => ({_time: r._time, _value: r.pcs, _field: \"PCs em execução\"}))\n]) |> group(columns: [\"_field\"])",
+          "refId": "A"
+        }
+      ],
+      "title": "Contexto: ar, janelas e ocupação",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "1m",
+  "schemaVersion": 39,
+  "tags": [
+    "gemeo-digital",
+    "labeee"
+  ],
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "timezone": "browser",
+  "title": "LabEEE — Desperdício de energia",
+  "uid": "labeee-desperdicio"
+}

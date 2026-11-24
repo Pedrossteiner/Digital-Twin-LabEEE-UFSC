@@ -1,0 +1,20 @@
+# Trecho do configuration.yaml do Home Assistant usado pelo Gêmeo Digital.
+# O servidor (Grafana e InfluxDB) está respondendo? Usado pela automação
+# "Alerta: servidor do Gêmeo Digital fora do ar". Troque IP_DO_SERVIDOR.
+rest:
+  - resource: http://IP_DO_SERVIDOR:3000/api/health
+    scan_interval: 120
+    timeout: 15
+    binary_sensor:
+      - name: "Servidor Grafana respondendo"
+        unique_id: gemeo_grafana_respondendo
+        device_class: connectivity
+        value_template: "{{ value_json is defined and value_json.database == 'ok' }}"
+  - resource: http://IP_DO_SERVIDOR:8086/health
+    scan_interval: 120
+    timeout: 15
+    binary_sensor:
+      - name: "Servidor InfluxDB respondendo"
+        unique_id: gemeo_influxdb_respondendo
+        device_class: connectivity
+        value_template: "{{ value_json is defined and value_json.status == 'pass' }}"

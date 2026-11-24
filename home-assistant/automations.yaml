@@ -1,0 +1,1078 @@
+- id: '1769191354876'
+  alias: Notificação de Indisponível do Daikin
+  description: Avisa no Slack (Pedro e Léo) qual Daikin ficou indisponível e onde
+    ele fica.
+  triggers:
+  - trigger: state
+    entity_id:
+    - sensor.daikin_1_00_state
+    - sensor.daikin_1_01_state
+    - sensor.daikin_1_02_state
+    - sensor.daikin_1_03_state
+    - sensor.daikin_1_04_state
+    - sensor.daikin_1_05_state
+    - sensor.daikin_1_06_state
+    - sensor.daikin_1_07_state
+    - sensor.daikin_1_08_state
+    to:
+    - unavailable
+    for:
+      hours: 0
+      minutes: 1
+      seconds: 0
+  conditions: []
+  actions:
+  - action: notify.labeee
+    data:
+      title: Daikin indisponível
+      message: '{% set u = trigger.entity_id.split(''.'')[1].replace(''daikin_'','''').replace(''_state'','''').replace(''_'',''-'')
+        %}{% set locais = {''1-00'':''Sala de reunião 1'',''1-01'':''Sala de reunião
+        2'',''1-02'':''Salão, bancada B1, mesas 51–54/61–64'',''1-03'':''Salão, bancada
+        B2, mesas 31–34/41–44'',''1-04'':''Salão, bancada B3, mesas 11–14/21–24'',''1-05'':''Salão,
+        bancada B5, mesas 35–37/45–47'',''1-06'':''Salão, bancada B4, mesas 15–17/25–27'',''1-07'':''Sala
+        da Ana Paula'',''1-08'':''Sala do Lamberts''} %}⚠️ O ar-condicionado Daikin
+        {{ u }} ({{ locais.get(u, ''local desconhecido'') }}) ficou indisponível às
+        {{ now().strftime(''%H:%M'') }}.'
+      target:
+      - SLACK_ID_PESSOA_1
+      - SLACK_ID_PESSOA_2
+  mode: parallel
+- id: '1770065074292'
+  alias: Automação de Reinicialização Forçada Daikin
+  description: ''
+  triggers:
+  - trigger: state
+    entity_id:
+    - climate.daikin_1_00
+    to:
+    - unavailable
+    for:
+      hours: 0
+      minutes: 5
+      seconds: 0
+  conditions: []
+  actions:
+  - action: script.slack_notificar_indisponivel_daikin
+    metadata: {}
+    data: {}
+  - action: homeassistant.reload_config_entry
+    target:
+      entity_id: climate.daikin_1_00
+    data: {}
+  - delay:
+      hours: 0
+      minutes: 1
+      seconds: 0
+      milliseconds: 0
+  - choose:
+    - conditions:
+      - condition: state
+        entity_id: climate.daikin_1_00
+        state:
+        - unavailable
+      sequence:
+      - action: notify.labeee
+        data:
+          message: ⚠️ Falha na recuperação. O Daikin continua fora do ar. Verificar
+            manualmente.
+          title: Falha Crítica Daikin
+          target:
+          - SLACK_ID_PESSOA_2
+          - SLACK_ID_PESSOA_1
+    default:
+    - action: notify.labeee
+      data:
+        message: ✅ Sistema recuperado! O Daikin voltou a funcionar sozinho.
+        title: Recuperação Automática
+        target:
+        - SLACK_ID_PESSOA_2
+        - SLACK_ID_PESSOA_1
+  mode: single
+- id: '1773073239077'
+  alias: 'Alerta Slack: Sensores Sonoff'
+  description: Avisa no Slack quando um sensor de janela/porta fica 24 h indisponível
+    (antes eram 10 s; eles costumam ficar indisponíveis quando ficam muito tempo sem
+    ser mexidos). Alterado em 12/11/2026.
+  triggers:
+  - trigger: state
+    entity_id:
+    - binary_sensor.1a_contact
+    - binary_sensor.2a_contact
+    - binary_sensor.3a_contact
+    - binary_sensor.4a_contact
+    - binary_sensor.5a_contact
+    - binary_sensor.6a_contact
+    - binary_sensor.7a_contact
+    - binary_sensor.8a_contact
+    - binary_sensor.9a_contact
+    - binary_sensor.10a_contact
+    - binary_sensor.11a_contact
+    - binary_sensor.12a_contact
+    - binary_sensor.1b_contact
+    - binary_sensor.2b_contact
+    - binary_sensor.3b_contact
+    - binary_sensor.4b_contact
+    - binary_sensor.5b_contact
+    - binary_sensor.6b_contact
+    - binary_sensor.7b_contact
+    - binary_sensor.8b_contact
+    - binary_sensor.9b_contact
+    - binary_sensor.c1_contact
+    - binary_sensor.c2_contact
+    - binary_sensor.c3_contact
+    - binary_sensor.ap1_contact
+    - binary_sensor.ap2_contact
+    - binary_sensor.ap3_contact
+    - binary_sensor.1r1_contact
+    - binary_sensor.2r1_contact
+    - binary_sensor.3r1_contact
+    - binary_sensor.1r2_contact
+    - binary_sensor.2r2_contact
+    - binary_sensor.3r2_contact
+    - binary_sensor.po1_contact
+    - binary_sensor.pc_contact
+    - binary_sensor.pr1_contact
+    - binary_sensor.pr2_contact
+    - binary_sensor.plb_contact
+    to:
+    - unavailable
+    - unknown
+    for:
+      hours: 24
+      minutes: 0
+      seconds: 0
+  actions:
+  - action: notify.labeee
+    data:
+      message: "\U0001FA9F *Sensor de janela/porta fora do ar há 24 h* — {{ trigger.to_state.name
+        }} está indisponível desde {{ trigger.to_state.last_changed | as_local | as_timestamp
+        | timestamp_custom('%d/%m %H:%M') }}. Costuma voltar quando a janela é aberta
+        e fechada; se não voltar, confira a bateria."
+      target:
+      - SLACK_ID_PESSOA_2
+      - SLACK_ID_PESSOA_1
+  mode: parallel
+- id: '1792067659199'
+  alias: Publicar HOBO no MQTT
+  description: Publica temperatura, umidade e CO2 dos Onset no broker local
+  triggers:
+  - entity_id:
+    - sensor.onset20589702
+    - sensor.onset20589706
+    - sensor.onset20589709
+    - sensor.onset20589716
+    - sensor.onset20589717
+    - sensor.onset20589721
+    - sensor.onset20589722
+    - sensor.onset20589725
+    - sensor.onset20589729
+    - sensor.onset20589732
+    - sensor.onset20589733
+    - sensor.onset20589744
+    - sensor.onset20589761
+    - sensor.onset20589763
+    - sensor.onset20589766
+    - sensor.onset20590558
+    - sensor.onset20590559
+    - sensor.onset20590561
+    - sensor.onset20590562
+    - sensor.onset20590564
+    trigger: state
+  conditions:
+  - condition: template
+    value_template: '{{ state_attr(trigger.entity_id, ''Temperature'') is not none
+      }}'
+  actions:
+  - data:
+      topic: lab/hobo/{{ trigger.entity_id.split('.')[1] | replace('onset','') }}
+      payload: '{% set s = trigger.entity_id.split(''.'')[1] | replace(''onset'','''')
+        %}{% set t = state_attr(trigger.entity_id, ''Temperature'') | float %}{% set
+        h = state_attr(trigger.entity_id, ''RH'') | float %}{% set c = state_attr(trigger.entity_id,
+        ''CO2'') %}{% if c is none %}{{ {''serie'': s, ''temp_c'': t, ''ur_pct'':
+        h} | to_json }}{% else %}{{ {''serie'': s, ''temp_c'': t, ''ur_pct'': h, ''co2_ppm'':
+        c | float} | to_json }}{% endif %}'
+    action: mqtt.publish
+  mode: queued
+  max: 40
+- id: publicar_presenca_mqtt
+  alias: Publicar presença dos PCs no MQTT
+  description: Publica em lab/presenca/<mesa> se o PC está em execução (1) ou parado
+    (0), a partir das tomadas Sonoff. Usado pelo Telegraf/Grafana.
+  triggers:
+  - trigger: state
+    entity_id:
+    - binary_sensor.presenca_pc_11
+    - binary_sensor.presenca_pc_12
+    - binary_sensor.presenca_pc_13
+    - binary_sensor.presenca_pc_14
+    - binary_sensor.presenca_pc_15
+    - binary_sensor.presenca_pc_16
+    - binary_sensor.presenca_pc_17
+    - binary_sensor.presenca_pc_21
+    - binary_sensor.presenca_pc_22
+    - binary_sensor.presenca_pc_23
+    - binary_sensor.presenca_pc_24
+    - binary_sensor.presenca_pc_25
+    - binary_sensor.presenca_pc_26
+    - binary_sensor.presenca_pc_27
+    - binary_sensor.presenca_pc_31
+    - binary_sensor.presenca_pc_32
+    - binary_sensor.presenca_pc_33
+    - binary_sensor.presenca_pc_34
+    - binary_sensor.presenca_pc_35
+    - binary_sensor.presenca_pc_36
+    - binary_sensor.presenca_pc_37
+    - binary_sensor.presenca_pc_41
+    - binary_sensor.presenca_pc_42
+    - binary_sensor.presenca_pc_43
+    - binary_sensor.presenca_pc_44
+    - binary_sensor.presenca_pc_45
+    - binary_sensor.presenca_pc_46
+    - binary_sensor.presenca_pc_47
+    - binary_sensor.presenca_pc_51
+    - binary_sensor.presenca_pc_52
+    - binary_sensor.presenca_pc_53
+    - binary_sensor.presenca_pc_54
+    - binary_sensor.presenca_pc_61
+    - binary_sensor.presenca_pc_62
+    - binary_sensor.presenca_pc_63
+    - binary_sensor.presenca_pc_64
+  - trigger: time_pattern
+    minutes: /10
+  - trigger: homeassistant
+    event: start
+  conditions: []
+  actions:
+  - repeat:
+      for_each:
+      - binary_sensor.presenca_pc_11
+      - binary_sensor.presenca_pc_12
+      - binary_sensor.presenca_pc_13
+      - binary_sensor.presenca_pc_14
+      - binary_sensor.presenca_pc_15
+      - binary_sensor.presenca_pc_16
+      - binary_sensor.presenca_pc_17
+      - binary_sensor.presenca_pc_21
+      - binary_sensor.presenca_pc_22
+      - binary_sensor.presenca_pc_23
+      - binary_sensor.presenca_pc_24
+      - binary_sensor.presenca_pc_25
+      - binary_sensor.presenca_pc_26
+      - binary_sensor.presenca_pc_27
+      - binary_sensor.presenca_pc_31
+      - binary_sensor.presenca_pc_32
+      - binary_sensor.presenca_pc_33
+      - binary_sensor.presenca_pc_34
+      - binary_sensor.presenca_pc_35
+      - binary_sensor.presenca_pc_36
+      - binary_sensor.presenca_pc_37
+      - binary_sensor.presenca_pc_41
+      - binary_sensor.presenca_pc_42
+      - binary_sensor.presenca_pc_43
+      - binary_sensor.presenca_pc_44
+      - binary_sensor.presenca_pc_45
+      - binary_sensor.presenca_pc_46
+      - binary_sensor.presenca_pc_47
+      - binary_sensor.presenca_pc_51
+      - binary_sensor.presenca_pc_52
+      - binary_sensor.presenca_pc_53
+      - binary_sensor.presenca_pc_54
+      - binary_sensor.presenca_pc_61
+      - binary_sensor.presenca_pc_62
+      - binary_sensor.presenca_pc_63
+      - binary_sensor.presenca_pc_64
+      sequence:
+      - action: mqtt.publish
+        data:
+          topic: lab/presenca/{{ repeat.item | replace('binary_sensor.presenca_pc_','')
+            }}
+          payload: '{"presente": {{ 1 if is_state(repeat.item, ''on'') else 0 }}}'
+          retain: true
+  mode: queued
+  max: 10
+- id: publicar_daikin_mqtt
+  alias: Publicar Daikin no MQTT
+  description: Publica em lab/daikin/<unidade> o estado de cada evaporadora Daikin
+    (ligado, setpoint, temperatura de retorno, modo, ventilador, filtro). Usado pelo
+    Telegraf/Grafana.
+  triggers:
+  - trigger: state
+    entity_id:
+    - climate.daikin_1_00
+    - climate.daikin_1_01
+    - climate.daikin_1_02
+    - climate.daikin_1_03
+    - climate.daikin_1_04
+    - climate.daikin_1_05
+    - climate.daikin_1_06
+    - climate.daikin_1_07
+    - climate.daikin_1_08
+    to:
+  - trigger: time_pattern
+    minutes: /10
+  - trigger: homeassistant
+    event: start
+  conditions: []
+  actions:
+  - repeat:
+      for_each:
+      - climate.daikin_1_00
+      - climate.daikin_1_01
+      - climate.daikin_1_02
+      - climate.daikin_1_03
+      - climate.daikin_1_04
+      - climate.daikin_1_05
+      - climate.daikin_1_06
+      - climate.daikin_1_07
+      - climate.daikin_1_08
+      sequence:
+      - action: mqtt.publish
+        data:
+          topic: lab/daikin/{{ repeat.item | replace('climate.daikin_','') }}
+          payload: '{% set u = repeat.item | replace(''climate.daikin_'','''') %}{"ligado":
+            {{ 0 if is_state(repeat.item, ''off'') or is_state(repeat.item, ''unavailable'')
+            else 1 }}, "disponivel": {{ 0 if is_state(repeat.item, ''unavailable'')
+            else 1 }}, "setpoint": {{ state_attr(repeat.item, ''temperature'') | float(0)
+            }}, "temp_retorno": {{ state_attr(repeat.item, ''current_temperature'')
+            | float(0) }}, "modo": "{{ states(''select.daikin_'' ~ u ~ ''_mode'')
+            | lower }}", "ventilador": "{{ states(''select.daikin_'' ~ u ~ ''_fan_speed'')
+            | lower }}", "filtro_sujo": {{ 1 if is_state(''binary_sensor.daikin_''
+            ~ u ~ ''_filter_warning'', ''on'') else 0 }}}'
+          retain: true
+  mode: queued
+  max: 10
+- id: alerta_ar_janela_aberta
+  alias: 'Alerta: ar ligado com janela aberta'
+  description: Avisa quando alguma evaporadora Daikin fica ligada por 10 min com alguma
+    janela ou porta do salão aberta. Só os 5 ares do salão (1-02 a 1-06) desde 10/11/2026.
+  triggers:
+  - trigger: template
+    value_template: '{{ ([''climate.daikin_1_02'', ''climate.daikin_1_03'', ''climate.daikin_1_04'',
+      ''climate.daikin_1_05'', ''climate.daikin_1_06''] | reject(''is_state'', ''off'')
+      | reject(''is_state'', ''unavailable'') | reject(''is_state'', ''unknown'')
+      | list) | count > 0 and ([''binary_sensor.1a_contact'', ''binary_sensor.2a_contact'',
+      ''binary_sensor.3a_contact'', ''binary_sensor.4a_contact'', ''binary_sensor.5a_contact'',
+      ''binary_sensor.6a_contact'', ''binary_sensor.7a_contact'', ''binary_sensor.8a_contact'',
+      ''binary_sensor.9a_contact'', ''binary_sensor.10a_contact'', ''binary_sensor.11a_contact'',
+      ''binary_sensor.12a_contact'', ''binary_sensor.1b_contact'', ''binary_sensor.2b_contact'',
+      ''binary_sensor.3b_contact'', ''binary_sensor.4b_contact'', ''binary_sensor.5b_contact'',
+      ''binary_sensor.6b_contact'', ''binary_sensor.7b_contact'', ''binary_sensor.8b_contact'',
+      ''binary_sensor.9b_contact''] | select(''is_state'', ''on'') | list | count)
+      > 0 }}'
+    for:
+      minutes: 10
+  conditions: []
+  actions:
+  - action: persistent_notification.create
+    data:
+      notification_id: alerta_ar_janela
+      title: Ar ligado com janela aberta
+      message: 'Ar ligado: {{ ([''climate.daikin_1_02'', ''climate.daikin_1_03'',
+        ''climate.daikin_1_04'', ''climate.daikin_1_05'', ''climate.daikin_1_06'']
+        | reject(''is_state'', ''off'') | reject(''is_state'', ''unavailable'') |
+        reject(''is_state'', ''unknown'') | list) | map(''state_attr'', ''friendly_name'')
+        | join('', '') }}. Abertas: {{ [''binary_sensor.1a_contact'', ''binary_sensor.2a_contact'',
+        ''binary_sensor.3a_contact'', ''binary_sensor.4a_contact'', ''binary_sensor.5a_contact'',
+        ''binary_sensor.6a_contact'', ''binary_sensor.7a_contact'', ''binary_sensor.8a_contact'',
+        ''binary_sensor.9a_contact'', ''binary_sensor.10a_contact'', ''binary_sensor.11a_contact'',
+        ''binary_sensor.12a_contact'', ''binary_sensor.1b_contact'', ''binary_sensor.2b_contact'',
+        ''binary_sensor.3b_contact'', ''binary_sensor.4b_contact'', ''binary_sensor.5b_contact'',
+        ''binary_sensor.6b_contact'', ''binary_sensor.7b_contact'', ''binary_sensor.8b_contact'',
+        ''binary_sensor.9b_contact''] | select(''is_state'', ''on'') | map(''replace'',
+        ''binary_sensor.'', '''') | map(''replace'', ''_contact'', '''') | map(''upper'')
+        | join('', '') }}.'
+  - action: notify.labeee
+    data:
+      title: Ar ligado com janela aberta
+      message: '⚠️ *Ar ligado com janela aberta* — Ar ligado: {{ ([''climate.daikin_1_02'',
+        ''climate.daikin_1_03'', ''climate.daikin_1_04'', ''climate.daikin_1_05'',
+        ''climate.daikin_1_06''] | reject(''is_state'', ''off'') | reject(''is_state'',
+        ''unavailable'') | reject(''is_state'', ''unknown'') | list) | map(''state_attr'',
+        ''friendly_name'') | join('', '') }}. Abertas: {{ [''binary_sensor.1a_contact'',
+        ''binary_sensor.2a_contact'', ''binary_sensor.3a_contact'', ''binary_sensor.4a_contact'',
+        ''binary_sensor.5a_contact'', ''binary_sensor.6a_contact'', ''binary_sensor.7a_contact'',
+        ''binary_sensor.8a_contact'', ''binary_sensor.9a_contact'', ''binary_sensor.10a_contact'',
+        ''binary_sensor.11a_contact'', ''binary_sensor.12a_contact'', ''binary_sensor.1b_contact'',
+        ''binary_sensor.2b_contact'', ''binary_sensor.3b_contact'', ''binary_sensor.4b_contact'',
+        ''binary_sensor.5b_contact'', ''binary_sensor.6b_contact'', ''binary_sensor.7b_contact'',
+        ''binary_sensor.8b_contact'', ''binary_sensor.9b_contact''] | select(''is_state'',
+        ''on'') | map(''replace'', ''binary_sensor.'', '''') | map(''replace'', ''_contact'',
+        '''') | map(''upper'') | join('', '') }}.'
+      target:
+      - SLACK_ID_PESSOA_1
+      - SLACK_ID_PESSOA_2
+  mode: single
+- id: alerta_ar_sem_ocupacao
+  alias: 'Alerta: ar ligado sem ninguém embaixo (por zona)'
+  description: 'Para cada evaporadora do salão: avisa se ela fica 20 min ligada sem
+    nenhum PC em execução nas mesas embaixo dela.'
+  triggers:
+  - trigger: template
+    id: '1_04'
+    for:
+      minutes: 20
+    value_template: '{{ (states(''climate.daikin_1_04'') not in [''off'', ''unavailable'',
+      ''unknown'']) and ([''binary_sensor.presenca_pc_11'', ''binary_sensor.presenca_pc_12'',
+      ''binary_sensor.presenca_pc_13'', ''binary_sensor.presenca_pc_14'', ''binary_sensor.presenca_pc_21'',
+      ''binary_sensor.presenca_pc_22'', ''binary_sensor.presenca_pc_23'', ''binary_sensor.presenca_pc_24'']
+      | select(''is_state'', ''on'') | list | count) == 0 }}'
+  - trigger: template
+    id: '1_06'
+    for:
+      minutes: 20
+    value_template: '{{ (states(''climate.daikin_1_06'') not in [''off'', ''unavailable'',
+      ''unknown'']) and ([''binary_sensor.presenca_pc_15'', ''binary_sensor.presenca_pc_16'',
+      ''binary_sensor.presenca_pc_17'', ''binary_sensor.presenca_pc_25'', ''binary_sensor.presenca_pc_26'',
+      ''binary_sensor.presenca_pc_27''] | select(''is_state'', ''on'') | list | count)
+      == 0 }}'
+  - trigger: template
+    id: '1_03'
+    for:
+      minutes: 20
+    value_template: '{{ (states(''climate.daikin_1_03'') not in [''off'', ''unavailable'',
+      ''unknown'']) and ([''binary_sensor.presenca_pc_31'', ''binary_sensor.presenca_pc_32'',
+      ''binary_sensor.presenca_pc_33'', ''binary_sensor.presenca_pc_34'', ''binary_sensor.presenca_pc_41'',
+      ''binary_sensor.presenca_pc_42'', ''binary_sensor.presenca_pc_43'', ''binary_sensor.presenca_pc_44'']
+      | select(''is_state'', ''on'') | list | count) == 0 }}'
+  - trigger: template
+    id: '1_05'
+    for:
+      minutes: 20
+    value_template: '{{ (states(''climate.daikin_1_05'') not in [''off'', ''unavailable'',
+      ''unknown'']) and ([''binary_sensor.presenca_pc_35'', ''binary_sensor.presenca_pc_36'',
+      ''binary_sensor.presenca_pc_37'', ''binary_sensor.presenca_pc_45'', ''binary_sensor.presenca_pc_46'',
+      ''binary_sensor.presenca_pc_47''] | select(''is_state'', ''on'') | list | count)
+      == 0 }}'
+  - trigger: template
+    id: '1_02'
+    for:
+      minutes: 20
+    value_template: '{{ (states(''climate.daikin_1_02'') not in [''off'', ''unavailable'',
+      ''unknown'']) and ([''binary_sensor.presenca_pc_51'', ''binary_sensor.presenca_pc_52'',
+      ''binary_sensor.presenca_pc_53'', ''binary_sensor.presenca_pc_54'', ''binary_sensor.presenca_pc_61'',
+      ''binary_sensor.presenca_pc_62'', ''binary_sensor.presenca_pc_63'', ''binary_sensor.presenca_pc_64'']
+      | select(''is_state'', ''on'') | list | count) == 0 }}'
+  conditions: []
+  actions:
+  - action: persistent_notification.create
+    data:
+      notification_id: alerta_ar_vazio_{{ trigger.id }}
+      title: Ar ligado sem ninguém
+      message: '{% set z = {''1_04'': ''11–14 e 21–24'', ''1_06'': ''15–17 e 25–27'',
+        ''1_03'': ''31–34 e 41–44'', ''1_05'': ''35–37 e 45–47'', ''1_02'': ''51–54
+        e 61–64''} %}Daikin {{ trigger.id | replace(''_'', ''-'') }} ligado há 20
+        min e nenhum PC das mesas {{ z[trigger.id] }} em execução.'
+  - action: notify.labeee
+    data:
+      title: Ar ligado sem ninguém
+      message: '⚠️ *Ar ligado sem ninguém* — {% set z = {''1_04'': ''11–14 e 21–24'',
+        ''1_06'': ''15–17 e 25–27'', ''1_03'': ''31–34 e 41–44'', ''1_05'': ''35–37
+        e 45–47'', ''1_02'': ''51–54 e 61–64''} %}Daikin {{ trigger.id | replace(''_'',
+        ''-'') }} ligado há 20 min e nenhum PC das mesas {{ z[trigger.id] }} em execução.'
+      target:
+      - SLACK_ID_PESSOA_1
+      - SLACK_ID_PESSOA_2
+  mode: parallel
+  max: 10
+- id: alerta_co2_alto
+  alias: 'Alerta: CO2 acima de 1000 ppm'
+  description: Avisa quando algum MX1102 passa de 1000 ppm por 15 min (pede ventilação).
+  triggers:
+  - trigger: template
+    value_template: '{{ [''sensor.onset20590558'', ''sensor.onset20590559'', ''sensor.onset20590561'',
+      ''sensor.onset20590562'', ''sensor.onset20590564''] | map(''state_attr'', ''CO2'')
+      | map(''float'', 0) | max > 1000 }}'
+    for:
+      minutes: 15
+  conditions: []
+  actions:
+  - action: persistent_notification.create
+    data:
+      notification_id: alerta_co2
+      title: CO2 alto no salão
+      message: '{% for s in [''sensor.onset20590558'', ''sensor.onset20590559'', ''sensor.onset20590561'',
+        ''sensor.onset20590562'', ''sensor.onset20590564''] if state_attr(s, ''CO2'')
+        | float(0) > 1000 %}MX1102 {{ s | replace(''sensor.onset'', '''') }}: {{ state_attr(s,
+        ''CO2'') }} ppm. {% endfor %}Vale abrir janelas ou aumentar a ventilação.'
+  - action: notify.labeee
+    data:
+      title: CO2 alto no salão
+      message: '⚠️ *CO2 alto no salão* — {% for s in [''sensor.onset20590558'', ''sensor.onset20590559'',
+        ''sensor.onset20590561'', ''sensor.onset20590562'', ''sensor.onset20590564'']
+        if state_attr(s, ''CO2'') | float(0) > 1000 %}MX1102 {{ s | replace(''sensor.onset'',
+        '''') }}: {{ state_attr(s, ''CO2'') }} ppm. {% endfor %}Vale abrir janelas
+        ou aumentar a ventilação.'
+      target:
+      - SLACK_ID_PESSOA_1
+      - SLACK_ID_PESSOA_2
+  mode: single
+- id: publicar_janelas_mqtt
+  alias: Publicar janelas e portas no MQTT
+  description: Publica em lab/janela/<NOME> o estado de cada sensor de contato (aberta,
+    disponível, bateria) a cada 10 min e a cada mudança. Garante que o InfluxDB/Grafana
+    fique com o estado certo mesmo depois de uma queda do Telegraf.
+  triggers:
+  - trigger: state
+    entity_id:
+    - binary_sensor.10a_contact
+    - binary_sensor.11a_contact
+    - binary_sensor.12a_contact
+    - binary_sensor.1a_contact
+    - binary_sensor.1b_contact
+    - binary_sensor.1r1_contact
+    - binary_sensor.1r2_contact
+    - binary_sensor.2a_contact
+    - binary_sensor.2b_contact
+    - binary_sensor.2r1_contact
+    - binary_sensor.2r2_contact
+    - binary_sensor.3a_contact
+    - binary_sensor.3b_contact
+    - binary_sensor.3r1_contact
+    - binary_sensor.3r2_contact
+    - binary_sensor.4a_contact
+    - binary_sensor.4b_contact
+    - binary_sensor.5a_contact
+    - binary_sensor.5b_contact
+    - binary_sensor.6a_contact
+    - binary_sensor.6b_contact
+    - binary_sensor.7a_contact
+    - binary_sensor.7b_contact
+    - binary_sensor.8a_contact
+    - binary_sensor.8b_contact
+    - binary_sensor.9a_contact
+    - binary_sensor.9b_contact
+    - binary_sensor.ap1_contact
+    - binary_sensor.ap2_contact
+    - binary_sensor.ap3_contact
+    - binary_sensor.c1_contact
+    - binary_sensor.c2_contact
+    - binary_sensor.c3_contact
+    - binary_sensor.pam_contact
+    - binary_sensor.pc_contact
+    - binary_sensor.plb_contact
+    - binary_sensor.po1_contact
+    - binary_sensor.pr1_contact
+    - binary_sensor.pr2_contact
+    - binary_sensor.rl1_contact
+    - binary_sensor.rl2_contact
+    - binary_sensor.rl3_contact
+    to:
+  - trigger: time_pattern
+    minutes: /10
+  - trigger: homeassistant
+    event: start
+  conditions: []
+  actions:
+  - repeat:
+      for_each:
+      - binary_sensor.10a_contact
+      - binary_sensor.11a_contact
+      - binary_sensor.12a_contact
+      - binary_sensor.1a_contact
+      - binary_sensor.1b_contact
+      - binary_sensor.1r1_contact
+      - binary_sensor.1r2_contact
+      - binary_sensor.2a_contact
+      - binary_sensor.2b_contact
+      - binary_sensor.2r1_contact
+      - binary_sensor.2r2_contact
+      - binary_sensor.3a_contact
+      - binary_sensor.3b_contact
+      - binary_sensor.3r1_contact
+      - binary_sensor.3r2_contact
+      - binary_sensor.4a_contact
+      - binary_sensor.4b_contact
+      - binary_sensor.5a_contact
+      - binary_sensor.5b_contact
+      - binary_sensor.6a_contact
+      - binary_sensor.6b_contact
+      - binary_sensor.7a_contact
+      - binary_sensor.7b_contact
+      - binary_sensor.8a_contact
+      - binary_sensor.8b_contact
+      - binary_sensor.9a_contact
+      - binary_sensor.9b_contact
+      - binary_sensor.ap1_contact
+      - binary_sensor.ap2_contact
+      - binary_sensor.ap3_contact
+      - binary_sensor.c1_contact
+      - binary_sensor.c2_contact
+      - binary_sensor.c3_contact
+      - binary_sensor.pam_contact
+      - binary_sensor.pc_contact
+      - binary_sensor.plb_contact
+      - binary_sensor.po1_contact
+      - binary_sensor.pr1_contact
+      - binary_sensor.pr2_contact
+      - binary_sensor.rl1_contact
+      - binary_sensor.rl2_contact
+      - binary_sensor.rl3_contact
+      sequence:
+      - action: mqtt.publish
+        data:
+          topic: lab/janela/{{ repeat.item | replace('binary_sensor.','') | replace('_contact','')
+            | upper }}
+          payload: '{% set n = repeat.item | replace(''binary_sensor.'','''') | replace(''_contact'','''')
+            %}{% set b = states(''sensor.'' ~ n ~ ''_battery'') %}{"aberta": {{ 1
+            if is_state(repeat.item, ''on'') else 0 }}, "disponivel": {{ 0 if states(repeat.item)
+            in [''unavailable'', ''unknown''] else 1 }}{% if b | is_number %}, "bateria":
+            {{ b | float }}{% endif %}}'
+          retain: true
+  mode: queued
+  max: 10
+- id: grafana_alertas_para_slack
+  alias: 'Grafana: alertas da coleta para o Slack'
+  description: Recebe os alertas do Grafana (webhook) e repassa para o Slack do Pedro
+    Steiner e do Leonardo Savi.
+  triggers:
+  - trigger: webhook
+    webhook_id: TROQUE_POR_UM_ID_SECRETO
+    allowed_methods:
+    - POST
+    local_only: true
+  conditions: []
+  actions:
+  - action: notify.labeee
+    data:
+      title: '{{ trigger.json.title | default(''Alerta do Grafana'') }}'
+      message: "{% set firing = trigger.json.status == 'firing' %}{{ '\U0001F534'
+        if firing else '✅' }} *{{ trigger.json.title | default('Alerta do Grafana')
+        }}*\n{% for a in trigger.json.alerts | default([]) %}• {{ a.annotations.summary
+        | default(a.labels.alertname) }}{% if a.status == 'resolved' %} (resolvido){%
+        endif %}\n{% endfor %}"
+      target:
+      - SLACK_ID_PESSOA_1
+      - SLACK_ID_PESSOA_2
+  mode: queued
+  max: 10
+- id: alerta_ar_fora_horario
+  alias: 'Alerta: ar ligado fora do horário'
+  description: Avisa se alguma evaporadora fica ligada por 15 min depois das 20h,
+    antes das 7h ou no fim de semana.
+  triggers:
+  - trigger: template
+    for:
+      minutes: 15
+    value_template: '{{ (now().hour >= 20 or now().hour < 7 or now().weekday() >=
+      5) and ([''climate.daikin_1_00'', ''climate.daikin_1_01'', ''climate.daikin_1_02'',
+      ''climate.daikin_1_03'', ''climate.daikin_1_04'', ''climate.daikin_1_05'', ''climate.daikin_1_06'',
+      ''climate.daikin_1_07'', ''climate.daikin_1_08''] | reject(''is_state'', ''off'')
+      | reject(''is_state'', ''unavailable'') | reject(''is_state'', ''unknown'')
+      | list) | count > 0 }}'
+  conditions: []
+  actions:
+  - action: persistent_notification.create
+    data:
+      notification_id: alerta_ar_fora_horario
+      title: Ar ligado fora do horário
+      message: 'Ligado(s): {{ ([''climate.daikin_1_00'', ''climate.daikin_1_01'',
+        ''climate.daikin_1_02'', ''climate.daikin_1_03'', ''climate.daikin_1_04'',
+        ''climate.daikin_1_05'', ''climate.daikin_1_06'', ''climate.daikin_1_07'',
+        ''climate.daikin_1_08''] | reject(''is_state'', ''off'') | reject(''is_state'',
+        ''unavailable'') | reject(''is_state'', ''unknown'') | list) | map(''state_attr'',
+        ''friendly_name'') | join('', '') }}. Alguém esqueceu de desligar?'
+  - action: notify.labeee
+    data:
+      title: Ar ligado fora do horário
+      message: "\U0001F319 *Ar ligado fora do horário* — {{ (['climate.daikin_1_00',
+        'climate.daikin_1_01', 'climate.daikin_1_02', 'climate.daikin_1_03', 'climate.daikin_1_04',
+        'climate.daikin_1_05', 'climate.daikin_1_06', 'climate.daikin_1_07', 'climate.daikin_1_08']
+        | reject('is_state', 'off') | reject('is_state', 'unavailable') | reject('is_state',
+        'unknown') | list) | map('state_attr', 'friendly_name') | join(', ') }}. Alguém
+        esqueceu de desligar?"
+      target:
+      - SLACK_ID_PESSOA_1
+      - SLACK_ID_PESSOA_2
+  mode: single
+- id: alerta_filtro_daikin
+  alias: 'Alerta: filtro do Daikin para limpar'
+  description: Toda segunda-feira às 9h, avisa quais evaporadoras estão pedindo limpeza
+    de filtro.
+  triggers:
+  - trigger: time
+    at: 09:00:00
+    weekday:
+    - mon
+  conditions:
+  - condition: template
+    value_template: '{{ [''binary_sensor.daikin_1_00_filter_warning'', ''binary_sensor.daikin_1_01_filter_warning'',
+      ''binary_sensor.daikin_1_02_filter_warning'', ''binary_sensor.daikin_1_03_filter_warning'',
+      ''binary_sensor.daikin_1_04_filter_warning'', ''binary_sensor.daikin_1_05_filter_warning'',
+      ''binary_sensor.daikin_1_06_filter_warning'', ''binary_sensor.daikin_1_07_filter_warning'',
+      ''binary_sensor.daikin_1_08_filter_warning''] | select(''is_state'', ''on'')
+      | list | count > 0 }}'
+  actions:
+  - action: notify.labeee
+    data:
+      title: Filtro do ar-condicionado
+      message: "\U0001F9F9 *Filtro para limpar* — {{ ['binary_sensor.daikin_1_00_filter_warning',
+        'binary_sensor.daikin_1_01_filter_warning', 'binary_sensor.daikin_1_02_filter_warning',
+        'binary_sensor.daikin_1_03_filter_warning', 'binary_sensor.daikin_1_04_filter_warning',
+        'binary_sensor.daikin_1_05_filter_warning', 'binary_sensor.daikin_1_06_filter_warning',
+        'binary_sensor.daikin_1_07_filter_warning', 'binary_sensor.daikin_1_08_filter_warning']
+        | select('is_state', 'on') | map('replace', 'binary_sensor.daikin_', 'Daikin
+        ') | map('replace', '_filter_warning', '') | map('replace', '_', '-') | join(',
+        ') }}."
+      target:
+      - SLACK_ID_PESSOA_1
+      - SLACK_ID_PESSOA_2
+  mode: single
+- id: alerta_shelly_offline
+  alias: 'Alerta: Shelly (gateway BLU) offline'
+  description: Avisa no Slack quando um dos gateways Shelly BLU (que trazem os HOBO
+    de cada bancada) fica 10 min sem responder, e avisa de novo quando ele volta.
+    Usa a entidade de firmware do Shelly, que fica indisponível quando o aparelho
+    cai.
+  triggers:
+  - trigger: state
+    entity_id:
+    - update.shelly_1_firmware
+    - update.teste_adaptador_bluetooth_para_sensores_shellyblu_2_31_44_firmware
+    - update.shellyblu_3_11_24_firmware
+    - update.shellyblu_4_15_27_firmware
+    - update.shellyblu_5_35_47_firmware
+    - update.shellyblu_sala_de_reunioes_2_firmware
+    to: unavailable
+    for:
+      minutes: 10
+    id: caiu
+  - trigger: state
+    entity_id:
+    - update.shelly_1_firmware
+    - update.teste_adaptador_bluetooth_para_sensores_shellyblu_2_31_44_firmware
+    - update.shellyblu_3_11_24_firmware
+    - update.shellyblu_4_15_27_firmware
+    - update.shellyblu_5_35_47_firmware
+    - update.shellyblu_sala_de_reunioes_2_firmware
+    from: unavailable
+    id: voltou
+  conditions:
+  - condition: template
+    value_template: '{{ trigger.id == ''caiu'' or (trigger.to_state.state not in [''unavailable'',''unknown'']
+      and (trigger.to_state.last_changed - trigger.from_state.last_changed).total_seconds()
+      >= 600) }}'
+  actions:
+  - choose:
+    - conditions:
+      - condition: trigger
+        id: caiu
+      sequence:
+      - action: persistent_notification.create
+        data:
+          notification_id: shelly_offline_{{ trigger.entity_id }}
+          title: Shelly offline
+          message: '{% set d = device_id(trigger.entity_id) %}{{ device_attr(d, ''name_by_user'')
+            or device_attr(d, ''name'') }} está sem responder desde {{ trigger.from_state.last_changed
+            | as_local | as_timestamp | timestamp_custom(''%H:%M'') }}. Os HOBO dessa
+            bancada param de chegar até ele voltar. Confira se está na tomada e no
+            Wi-Fi.'
+      - action: notify.labeee
+        data:
+          title: Shelly offline
+          target:
+          - SLACK_ID_PESSOA_1
+          - SLACK_ID_PESSOA_2
+          message: "\U0001F4E1 *Shelly offline* — {% set d = device_id(trigger.entity_id)
+            %}{{ device_attr(d, 'name_by_user') or device_attr(d, 'name') }} está
+            sem responder há 10 min (desde {{ trigger.from_state.last_changed | as_local
+            | as_timestamp | timestamp_custom('%H:%M') }}). Os HOBO dessa bancada
+            param de chegar até ele voltar. Confira se está na tomada e no Wi-Fi."
+    - conditions:
+      - condition: trigger
+        id: voltou
+      sequence:
+      - action: persistent_notification.dismiss
+        data:
+          notification_id: shelly_offline_{{ trigger.entity_id }}
+      - action: notify.labeee
+        data:
+          title: Shelly de volta
+          target:
+          - SLACK_ID_PESSOA_1
+          - SLACK_ID_PESSOA_2
+          message: ✅ *Shelly de volta* — {% set d = device_id(trigger.entity_id) %}{{
+            device_attr(d, 'name_by_user') or device_attr(d, 'name') }} voltou a responder
+            depois de {{ ((trigger.to_state.last_changed - trigger.from_state.last_changed).total_seconds()
+            / 60) | round(0) | int }} min fora.
+  mode: parallel
+- id: alerta_hobo_sem_dados
+  alias: 'Alerta: HOBO sem dados'
+  description: Avisa no Slack quando um HOBO fica 30 min sem mandar leitura (eles
+    mandam a cada ~10 min) e quando volta. Usa o sensor.onsetXXXXXXXX, cujo valor
+    é a hora da última leitura. Recriado em 12/11/2026 no lugar da antiga "Monitoramento
+    de Sensores HOBO", que tinha sumido.
+  triggers:
+  - trigger: template
+    value_template: '{% set v = states(''sensor.onset20589702'') | as_datetime %}{{
+      v is not none and (now() - v.replace(tzinfo=now().tzinfo)).total_seconds() >
+      1800 }}'
+    id: '20589702'
+  - trigger: template
+    value_template: '{% set v = states(''sensor.onset20589706'') | as_datetime %}{{
+      v is not none and (now() - v.replace(tzinfo=now().tzinfo)).total_seconds() >
+      1800 }}'
+    id: '20589706'
+  - trigger: template
+    value_template: '{% set v = states(''sensor.onset20589709'') | as_datetime %}{{
+      v is not none and (now() - v.replace(tzinfo=now().tzinfo)).total_seconds() >
+      1800 }}'
+    id: '20589709'
+  - trigger: template
+    value_template: '{% set v = states(''sensor.onset20589716'') | as_datetime %}{{
+      v is not none and (now() - v.replace(tzinfo=now().tzinfo)).total_seconds() >
+      1800 }}'
+    id: '20589716'
+  - trigger: template
+    value_template: '{% set v = states(''sensor.onset20589717'') | as_datetime %}{{
+      v is not none and (now() - v.replace(tzinfo=now().tzinfo)).total_seconds() >
+      1800 }}'
+    id: '20589717'
+  - trigger: template
+    value_template: '{% set v = states(''sensor.onset20589721'') | as_datetime %}{{
+      v is not none and (now() - v.replace(tzinfo=now().tzinfo)).total_seconds() >
+      1800 }}'
+    id: '20589721'
+  - trigger: template
+    value_template: '{% set v = states(''sensor.onset20589722'') | as_datetime %}{{
+      v is not none and (now() - v.replace(tzinfo=now().tzinfo)).total_seconds() >
+      1800 }}'
+    id: '20589722'
+  - trigger: template
+    value_template: '{% set v = states(''sensor.onset20589725'') | as_datetime %}{{
+      v is not none and (now() - v.replace(tzinfo=now().tzinfo)).total_seconds() >
+      1800 }}'
+    id: '20589725'
+  - trigger: template
+    value_template: '{% set v = states(''sensor.onset20589729'') | as_datetime %}{{
+      v is not none and (now() - v.replace(tzinfo=now().tzinfo)).total_seconds() >
+      1800 }}'
+    id: '20589729'
+  - trigger: template
+    value_template: '{% set v = states(''sensor.onset20589732'') | as_datetime %}{{
+      v is not none and (now() - v.replace(tzinfo=now().tzinfo)).total_seconds() >
+      1800 }}'
+    id: '20589732'
+  - trigger: template
+    value_template: '{% set v = states(''sensor.onset20589733'') | as_datetime %}{{
+      v is not none and (now() - v.replace(tzinfo=now().tzinfo)).total_seconds() >
+      1800 }}'
+    id: '20589733'
+  - trigger: template
+    value_template: '{% set v = states(''sensor.onset20589744'') | as_datetime %}{{
+      v is not none and (now() - v.replace(tzinfo=now().tzinfo)).total_seconds() >
+      1800 }}'
+    id: '20589744'
+  - trigger: template
+    value_template: '{% set v = states(''sensor.onset20589761'') | as_datetime %}{{
+      v is not none and (now() - v.replace(tzinfo=now().tzinfo)).total_seconds() >
+      1800 }}'
+    id: '20589761'
+  - trigger: template
+    value_template: '{% set v = states(''sensor.onset20589763'') | as_datetime %}{{
+      v is not none and (now() - v.replace(tzinfo=now().tzinfo)).total_seconds() >
+      1800 }}'
+    id: '20589763'
+  - trigger: template
+    value_template: '{% set v = states(''sensor.onset20589766'') | as_datetime %}{{
+      v is not none and (now() - v.replace(tzinfo=now().tzinfo)).total_seconds() >
+      1800 }}'
+    id: '20589766'
+  - trigger: template
+    value_template: '{% set v = states(''sensor.onset20590558'') | as_datetime %}{{
+      v is not none and (now() - v.replace(tzinfo=now().tzinfo)).total_seconds() >
+      1800 }}'
+    id: '20590558'
+  - trigger: template
+    value_template: '{% set v = states(''sensor.onset20590559'') | as_datetime %}{{
+      v is not none and (now() - v.replace(tzinfo=now().tzinfo)).total_seconds() >
+      1800 }}'
+    id: '20590559'
+  - trigger: template
+    value_template: '{% set v = states(''sensor.onset20590561'') | as_datetime %}{{
+      v is not none and (now() - v.replace(tzinfo=now().tzinfo)).total_seconds() >
+      1800 }}'
+    id: '20590561'
+  - trigger: template
+    value_template: '{% set v = states(''sensor.onset20590562'') | as_datetime %}{{
+      v is not none and (now() - v.replace(tzinfo=now().tzinfo)).total_seconds() >
+      1800 }}'
+    id: '20590562'
+  - trigger: template
+    value_template: '{% set v = states(''sensor.onset20590564'') | as_datetime %}{{
+      v is not none and (now() - v.replace(tzinfo=now().tzinfo)).total_seconds() >
+      1800 }}'
+    id: '20590564'
+  - trigger: template
+    value_template: '{% set v = states(''sensor.onset21530404'') | as_datetime %}{{
+      v is not none and (now() - v.replace(tzinfo=now().tzinfo)).total_seconds() >
+      1800 }}'
+    id: '21530404'
+  - trigger: state
+    entity_id:
+    - sensor.onset20589702
+    - sensor.onset20589706
+    - sensor.onset20589709
+    - sensor.onset20589716
+    - sensor.onset20589717
+    - sensor.onset20589721
+    - sensor.onset20589722
+    - sensor.onset20589725
+    - sensor.onset20589729
+    - sensor.onset20589732
+    - sensor.onset20589733
+    - sensor.onset20589744
+    - sensor.onset20589761
+    - sensor.onset20589763
+    - sensor.onset20589766
+    - sensor.onset20590558
+    - sensor.onset20590559
+    - sensor.onset20590561
+    - sensor.onset20590562
+    - sensor.onset20590564
+    - sensor.onset21530404
+    id: voltou
+  conditions:
+  - condition: template
+    value_template: '{% if trigger.id != ''voltou'' %}true{% else %}{% set a = trigger.from_state.state
+      | as_datetime %}{% set n = trigger.to_state.state | as_datetime %}{{ a is not
+      none and n is not none and (n - a).total_seconds() > 1800 }}{% endif %}'
+  actions:
+  - choose:
+    - conditions:
+      - condition: template
+        value_template: '{{ trigger.id != ''voltou'' }}'
+      sequence:
+      - action: persistent_notification.create
+        data:
+          notification_id: hobo_sem_dados_{{ trigger.id }}
+          title: HOBO sem dados
+          message: HOBO {{ trigger.id }} ({% set b = {'20589702':'Shelly 4 · mesas
+            15–27','20589706':'Shelly 1 · mesas 51–64','20589709':'Shelly 1 · mesas
+            51–64','20589716':'Shelly 1 · mesas 51–64','20589717':'Shelly 3 · mesas
+            11–24','20589721':'Shelly 5 · mesas 35–47','20589722':'Shelly 2 · mesas
+            31–44','20589725':'Shelly 4 · mesas 15–27','20589729':'Shelly 5 · mesas
+            35–47','20589732':'Shelly 2 · mesas 31–44','20589733':'Shelly 3 · mesas
+            11–24','20589744':'Shelly 2 · mesas 31–44','20589761':'Shelly 4 · mesas
+            15–27','20589763':'Shelly 3 · mesas 11–24','20589766':'Shelly 5 · mesas
+            35–47','20590558':'Shelly 5 · mesas 35–47','20590559':'Shelly 2 · mesas
+            31–44','20590561':'Shelly 1 · mesas 51–64','20590562':'Shelly 3 · mesas
+            11–24','20590564':'Shelly 4 · mesas 15–27'} %}{{ b.get(trigger.id, 'fora
+            da lista do salão') }}) não manda leitura desde {{ (states('sensor.onset'
+            ~ trigger.id) | as_datetime).strftime('%d/%m %H:%M') }}. Confira a bateria
+            e se ele está perto do Shelly da bancada.
+      - action: notify.labeee
+        data:
+          title: HOBO sem dados
+          target:
+          - SLACK_ID_PESSOA_1
+          - SLACK_ID_PESSOA_2
+          message: "\U0001F321️ *HOBO sem dados* — {{ trigger.id }} ({% set b = {'20589702':'Shelly
+            4 · mesas 15–27','20589706':'Shelly 1 · mesas 51–64','20589709':'Shelly
+            1 · mesas 51–64','20589716':'Shelly 1 · mesas 51–64','20589717':'Shelly
+            3 · mesas 11–24','20589721':'Shelly 5 · mesas 35–47','20589722':'Shelly
+            2 · mesas 31–44','20589725':'Shelly 4 · mesas 15–27','20589729':'Shelly
+            5 · mesas 35–47','20589732':'Shelly 2 · mesas 31–44','20589733':'Shelly
+            3 · mesas 11–24','20589744':'Shelly 2 · mesas 31–44','20589761':'Shelly
+            4 · mesas 15–27','20589763':'Shelly 3 · mesas 11–24','20589766':'Shelly
+            5 · mesas 35–47','20590558':'Shelly 5 · mesas 35–47','20590559':'Shelly
+            2 · mesas 31–44','20590561':'Shelly 1 · mesas 51–64','20590562':'Shelly
+            3 · mesas 11–24','20590564':'Shelly 4 · mesas 15–27'} %}{{ b.get(trigger.id,
+            'fora da lista do salão') }}) não manda leitura desde {{ (states('sensor.onset'
+            ~ trigger.id) | as_datetime).strftime('%d/%m %H:%M') }}. Confira a bateria
+            e se ele está perto do Shelly da bancada."
+    - conditions:
+      - condition: template
+        value_template: '{{ trigger.id == ''voltou'' }}'
+      sequence:
+      - action: persistent_notification.dismiss
+        data:
+          notification_id: hobo_sem_dados_{{ trigger.entity_id.replace('sensor.onset','')
+            }}
+      - action: notify.labeee
+        data:
+          title: HOBO de volta
+          target:
+          - SLACK_ID_PESSOA_1
+          - SLACK_ID_PESSOA_2
+          message: ✅ *HOBO de volta* — {{ trigger.entity_id.replace('sensor.onset','')
+            }} voltou a mandar dados depois de {{ (((trigger.to_state.state | as_datetime)
+            - (trigger.from_state.state | as_datetime)).total_seconds() / 3600) |
+            round(1) }} h sem leitura.
+  mode: parallel
+- id: alerta_servidor_fora_do_ar
+  alias: 'Alerta: servidor do Gêmeo Digital fora do ar'
+  description: 'Avisa no Slack quando o mini PC do servidor (ping em IP_DO_SERVIDOR),
+    o Grafana ou o InfluxDB ficam 5 min sem responder, e quando voltam. Os dois últimos
+    vêm do rest: no configuration.yaml (12/11/2026).'
+  triggers:
+  - trigger: state
+    entity_id:
+    - binary_sensor.192_168_0_134
+    - binary_sensor.servidor_grafana_respondendo
+    - binary_sensor.servidor_influxdb_respondendo
+    to:
+    - 'off'
+    - unavailable
+    for:
+      minutes: 5
+    id: caiu
+  - trigger: state
+    entity_id:
+    - binary_sensor.192_168_0_134
+    - binary_sensor.servidor_grafana_respondendo
+    - binary_sensor.servidor_influxdb_respondendo
+    from:
+    - 'off'
+    - unavailable
+    to: 'on'
+    id: voltou
+  conditions:
+  - condition: template
+    value_template: '{{ trigger.id == ''caiu'' or (trigger.to_state.last_changed -
+      trigger.from_state.last_changed).total_seconds() >= 300 }}'
+  actions:
+  - choose:
+    - conditions:
+      - condition: trigger
+        id: caiu
+      sequence:
+      - action: persistent_notification.create
+        data:
+          notification_id: servidor_{{ trigger.entity_id }}
+          title: Servidor do Gêmeo Digital fora do ar
+          message: '{{ {''binary_sensor.192_168_0_134'':''o mini PC do servidor (não
+            responde ao ping)'',''binary_sensor.servidor_grafana_respondendo'':''o
+            Grafana'',''binary_sensor.servidor_influxdb_respondendo'':''o InfluxDB''}[trigger.entity_id]
+            }} não responde desde {{ trigger.from_state.last_changed | as_local |
+            as_timestamp | timestamp_custom(''%d/%m %H:%M'') }}.'
+      - action: notify.labeee
+        data:
+          title: Servidor fora do ar
+          target:
+          - SLACK_ID_PESSOA_1
+          - SLACK_ID_PESSOA_2
+          message: "\U0001F5A5️ *Servidor do Gêmeo Digital* — {{ {'binary_sensor.192_168_0_134':'o
+            mini PC do servidor (não responde ao ping)','binary_sensor.servidor_grafana_respondendo':'o
+            Grafana','binary_sensor.servidor_influxdb_respondendo':'o InfluxDB'}[trigger.entity_id]
+            }} não responde há 5 min (desde {{ trigger.from_state.last_changed | as_local
+            | as_timestamp | timestamp_custom('%d/%m %H:%M') }}). Os dados param de
+            ser gravados enquanto isso. Confira o servidor (`docker ps` em ~/teste)."
+    - conditions:
+      - condition: trigger
+        id: voltou
+      sequence:
+      - action: persistent_notification.dismiss
+        data:
+          notification_id: servidor_{{ trigger.entity_id }}
+      - action: notify.labeee
+        data:
+          title: Servidor de volta
+          target:
+          - SLACK_ID_PESSOA_1
+          - SLACK_ID_PESSOA_2
+          message: ✅ *Servidor de volta* — {{ {'binary_sensor.192_168_0_134':'o mini
+            PC do servidor','binary_sensor.servidor_grafana_respondendo':'o Grafana','binary_sensor.servidor_influxdb_respondendo':'o
+            InfluxDB'}[trigger.entity_id] }} voltou a responder depois de {{ ((trigger.to_state.last_changed
+            - trigger.from_state.last_changed).total_seconds() / 60) | round(0) |
+            int }} min.
+  mode: parallel

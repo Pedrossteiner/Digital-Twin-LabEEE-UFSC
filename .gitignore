@@ -1,0 +1,5 @@
+.env
+*.bak*
+backups/
+__pycache__/
+portal-dados/modelo/*.bin.gz

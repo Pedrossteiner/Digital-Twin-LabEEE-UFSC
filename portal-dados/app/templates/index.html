@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block corpo %}
+<header>
+  <h1>LabEEE — Baixar dados</h1>
+  <span class="mut">Entrou como <b>{{ usuario }}</b> · <a href="{{ grafana }}">voltar ao Grafana</a></span>
+</header>
+
+<form id="f" action="baixar" method="get">
+  <div class="card">
+    <div class="grade">
+      <b>Período</b>
+      <div>
+        <div class="linha">
+          <input type="date" name="inicio" id="inicio" value="{{ inicio }}" max="{{ hoje }}" required>
+          <span>até</span>
+          <input type="date" name="fim" id="fim" value="{{ fim }}" max="{{ hoje }}" required>
+        </div>
+        <div class="linha atalhos" style="margin-top:8px">
+          <button type="button" data-d="hoje">Hoje</button>
+          <button type="button" data-d="ontem">Ontem</button>
+          <button type="button" data-d="7">Últimos 7 dias</button>
+          <button type="button" data-d="mes">Este mês</button>
+          <button type="button" data-d="mespassado">Mês passado</button>
+        </div>
+        <div class="mut" style="margin-top:4px">Os dois dias entram inteiros (de 00:00 do primeiro até 23:59 do último).</div>
+      </div>
+
+      <b>O que baixar</b>
+      <div>
+        <label class="op"><input type="checkbox" name="conjunto" value="ambiente" checked>
+          <span>Temperatura, umidade e CO₂<small>20 HOBO do salão (5 medem CO₂)</small></span></label>
+        <label class="op"><input type="checkbox" name="conjunto" value="presenca" checked>
+          <span>Presença nas mesas<small>36 mesas: ocupada ou não, e os períodos de ocupação</small></span></label>
+        <label class="op"><input type="checkbox" name="conjunto" value="janelas">
+          <span>Janelas e portas<small>21 do salão (1A–12A, 1B–9B): aberta ou fechada, e os períodos abertos</small></span></label>
+        <label class="op"><input type="checkbox" name="conjunto" value="ar">
+          <span>Ar-condicionado<small>9 Daikin: ligado, setpoint, temperatura de retorno, modo</small></span></label>
+      </div>
+
+      <b>De quanto em quanto tempo</b>
+      <div>
+        <span class="seg">
+          <label><input type="radio" name="resolucao" value="10min" checked>a cada 10 min</label>
+          <label><input type="radio" name="resolucao" value="1h">a cada hora</label>
+          <label><input type="radio" name="resolucao" value="bruto">bruto</label>
+        </span>
+        <div class="mut" id="dica_res" style="margin-top:4px">Recomendado. Uma linha a cada 10 min para cada sensor; presença, janelas e ar vêm como fração do tempo (0 a 1).</div>
+      </div>
+
+      <b>Horário</b>
+      <div>
+        <span class="seg">
+          <label><input type="radio" name="fuso" value="local" checked>Florianópolis</label>
+          <label><input type="radio" name="fuso" value="utc">UTC</label>
+        </span>
+      </div>
+
+      <b>Formato</b>
+      <div>
+        <span class="seg">
+          <label><input type="radio" name="formato" value="xlsx" checked>Excel (.xlsx)</label>
+          <label><input type="radio" name="formato" value="csv">CSV (Python, R)</label>
+        </span>
+        <div class="mut" style="margin-top:4px" id="dica_fmt">Uma planilha com uma aba por assunto e uma aba Leia-me.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="linha" style="margin-bottom:24px">
+    <button class="btn" id="btn" type="submit">⬇ Baixar</button>
+    <span class="mut" id="estimativa"></span>
+  </div>
+</form>
+
+<div class="card">
+  <h2>Meses prontos</h2>
+  {% if mensais %}
+  <ul class="mensal">
+    {% for m in mensais %}<li><a href="mensal/{{ m }}">{{ m | mes }} ⬇</a></li>{% endfor %}
+  </ul>
+  <div class="mut" style="margin-top:8px">Cada mês inteiro, a cada 10 min, horário de Florianópolis, com Excel e CSV juntos. Gerado automaticamente no dia 1º.</div>
+  {% else %}
+  <div class="mut">O primeiro pacote mensal aparece aqui no dia 1º do próximo mês.</div>
+  {% endif %}
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const ini = $("#inicio"), fim = $("#fim");
+const iso = d => d.toISOString().slice(0, 10);
+const hoje = new Date("{{ hoje }}T12:00:00");
+document.querySelectorAll(".atalhos button").forEach(b => b.onclick = () => {
+  const d = b.dataset.d; let a = new Date(hoje), z = new Date(hoje);
+  if (d === "ontem") { a.setDate(a.getDate() - 1); z = new Date(a); }
+  else if (d === "7") { a.setDate(a.getDate() - 6); }
+  else if (d === "mes") { a.setDate(1); }
+  else if (d === "mespassado") { a = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1, 12); z = new Date(hoje.getFullYear(), hoje.getMonth(), 0, 12); }
+  ini.value = iso(a); fim.value = iso(z); estima();
+});
+const POR_DIA = { // linhas por dia, aproximado
+  ambiente: { "10min": 20 * 144, "1h": 20 * 24, bruto: 20 * 150 },
+  presenca: { "10min": 36 * 144, "1h": 36 * 24, bruto: 36 * 300 },
+  janelas:  { "10min": 21 * 144, "1h": 21 * 24, bruto: 21 * 160 },
+  ar:       { "10min": 9 * 144,  "1h": 9 * 24,  bruto: 9 * 160 },
+};
+const DICAS = {
+  "10min": "Recomendado. Uma linha a cada 10 min para cada sensor; presença, janelas e ar vêm como fração do tempo (0 a 1).",
+  "1h": "Médias por hora. Bom para períodos longos e para abrir no Excel.",
+  bruto: "Cada leitura do jeito que chegou, sem médias. Máximo de {{ max_dias_bruto }} dias.",
+};
+function estima() {
+  const res = document.querySelector("input[name=resolucao]:checked").value;
+  const fmt = document.querySelector("input[name=formato]:checked").value;
+  $("#dica_res").textContent = DICAS[res];
+  $("#dica_fmt").textContent = fmt === "xlsx" ? "Uma planilha com uma aba por assunto e uma aba Leia-me." :
+    "Um arquivo .csv por assunto (vírgula e ponto decimal), mais um exemplo em Python.";
+  const dias = Math.round((new Date(fim.value) - new Date(ini.value)) / 864e5) + 1;
+  if (!(dias > 0)) { $("#estimativa").textContent = "A data final tem que ser depois da inicial."; $("#btn").disabled = true; return; }
+  let n = 0;
+  document.querySelectorAll("input[name=conjunto]:checked").forEach(c => n += POR_DIA[c.value][res] * dias);
+  const lim = res === "bruto" ? {{ max_dias_bruto }} : {{ max_dias }};
+  let msg = `${dias} dia${dias > 1 ? "s" : ""} · ≈ ${n.toLocaleString("pt-BR")} linhas`;
+  let ok = n > 0 && dias <= lim;
+  if (dias > lim) msg = `Período máximo para essa opção: ${lim} dias.`;
+  else if (n === 0) msg = "Marque pelo menos um tipo de dado.";
+  else if (fmt === "xlsx" && n > 1000000) { msg += " — muito para o Excel, escolha CSV ou um período menor."; ok = false; }
+  $("#estimativa").textContent = msg; $("#btn").disabled = !ok;
+}
+document.querySelectorAll("input").forEach(i => i.addEventListener("change", estima));
+estima();
+$("#f").addEventListener("submit", () => {
+  const b = $("#btn"); b.textContent = "Gerando… o download começa sozinho";
+  setTimeout(() => { b.textContent = "⬇ Baixar"; }, 15000);
+});
+</script>
+{% endblock %}

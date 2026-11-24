@@ -1,0 +1,533 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "links": [
+    {
+      "asDropdown": false,
+      "icon": "external link",
+      "includeVars": false,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": true,
+      "title": "Baixar dados",
+      "tooltip": "Baixar estes dados em Excel ou CSV",
+      "type": "link",
+      "url": "http://localhost:8090/"
+    },
+    {
+      "asDropdown": false,
+      "icon": "external link",
+      "includeVars": false,
+      "keepTime": false,
+      "tags": [],
+      "targetBlank": true,
+      "title": "Gêmeo 3D",
+      "tooltip": "Modelo 3D do lab com os sensores ao vivo",
+      "type": "link",
+      "url": "http://localhost:8090/gemeo3d"
+    }
+  ],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "influxdb"
+      },
+      "description": "Janelas e portas do salão (1A–12A, 1B–9B) abertas na última leitura.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "#FF9830",
+            "mode": "fixed"
+          },
+          "decimals": 0,
+          "noValue": "0",
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 5,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb"
+          },
+          "query": "from(bucket: \"LabEEE\")\n  |> range(start: -30m)\n  |> filter(fn: (r) => r._measurement == \"janela\" and (r._field == \"aberta\" or r._field == \"disponivel\"))\n  |> filter(fn: (r) => r.nome =~ /^(1[0-2]|[1-9])A$|^[1-9]B$/)\n  |> group(columns: [\"nome\", \"_field\"]) |> last() |> group()\n  |> pivot(rowKey: [\"nome\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> filter(fn: (r) => r.disponivel == 1.0 and r.aberta == 1.0)\n  |> count(column: \"nome\") |> map(fn: (r) => ({_value: r.nome}))",
+          "refId": "A"
+        }
+      ],
+      "title": "Abertas agora no salão",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "influxdb"
+      },
+      "description": "Sensores do salão sem resposta (bateria, sinal ou zigbee2mqtt).",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "#8AB8FF",
+            "mode": "fixed"
+          },
+          "decimals": 0,
+          "noValue": "0",
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 5,
+        "x": 5,
+        "y": 0
+      },
+      "id": 2,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb"
+          },
+          "query": "from(bucket: \"LabEEE\")\n  |> range(start: -30m)\n  |> filter(fn: (r) => r._measurement == \"janela\" and (r._field == \"aberta\" or r._field == \"disponivel\"))\n  |> filter(fn: (r) => r.nome =~ /^(1[0-2]|[1-9])A$|^[1-9]B$/)\n  |> group(columns: [\"nome\", \"_field\"]) |> last() |> group()\n  |> pivot(rowKey: [\"nome\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> filter(fn: (r) => r.disponivel == 0.0)\n  |> count(column: \"nome\") |> map(fn: (r) => ({_value: r.nome}))",
+          "refId": "A"
+        }
+      ],
+      "title": "Sensores do salão fora do ar",
+      "type": "stat"
+    },
+    {
+      "gridPos": {
+        "h": 5,
+        "w": 14,
+        "x": 10,
+        "y": 0
+      },
+      "id": 3,
+      "options": {
+        "content": "Cada linha é uma janela ou porta. <span style=\"color:#FF9830\">■</span> aberta · <span style=\"color:#6e7581\">■</span> fechada · <span style=\"color:#8AB8FF\">■</span> indisponível (sensor fora do ar).\n\n**Salão**: 1A–12A (lado A) e 1B–9B (lado B), na ordem da planta. **Outras salas**: os sensores antigos estão sendo trocados; por enquanto só o salão está 100% (piloto de coleta).\n\n*Dados: InfluxDB, bucket LabEEE, measurement `janela` (campos `aberta`, `disponivel`, `bateria`; tag `nome`).*",
+        "mode": "markdown"
+      },
+      "title": "Como ler",
+      "type": "text"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "influxdb"
+      },
+      "description": "Uma linha por janela/porta do salão.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "#6e7581",
+            "mode": "fixed"
+          },
+          "custom": {
+            "fillOpacity": 80,
+            "lineWidth": 0
+          },
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "color": "#6e7581",
+                  "index": 0,
+                  "text": "Fechada"
+                },
+                "1": {
+                  "color": "#FF9830",
+                  "index": 1,
+                  "text": "Aberta"
+                },
+                "2": {
+                  "color": "#8AB8FF",
+                  "index": 2,
+                  "text": "Indisponível"
+                }
+              },
+              "type": "value"
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 14,
+        "w": 24,
+        "x": 0,
+        "y": 5
+      },
+      "id": 4,
+      "options": {
+        "alignValue": "left",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "mergeValues": true,
+        "rowHeight": 0.85,
+        "showValue": "never",
+        "tooltip": {
+          "mode": "single"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb"
+          },
+          "query": "// Estado de cada janela/porta: 1 = aberta, 0 = fechada, 2 = indisponível (sensor fora do ar).\n// O Home Assistant publica todas a cada 10 min e sempre que alguma muda.\nimport \"date\"\npasso = if int(v: v.windowPeriod) > int(v: 5m) then v.windowPeriod else 5m\nfrom(bucket: \"LabEEE\")\n  |> range(start: date.sub(d: 1h, from: v.timeRangeStart), stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"janela\" and (r._field == \"aberta\" or r._field == \"disponivel\"))\n  |> filter(fn: (r) => r.nome =~ /^(1[0-2]|[1-9])A$|^[1-9]B$/)\n  |> group(columns: [\"nome\", \"_field\"])\n  |> aggregateWindow(every: passo, fn: last, createEmpty: true)\n  |> fill(usePrevious: true)\n  |> filter(fn: (r) => r._time >= v.timeRangeStart and exists r._value)\n  |> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> map(fn: (r) => ({_time: r._time, nome: r.nome, _value: if r.disponivel == 0.0 then 2.0 else r.aberta}))\n  |> group()\n  |> pivot(rowKey: [\"_time\"], columnKey: [\"nome\"], valueColumn: \"_value\")",
+          "refId": "A"
+        }
+      ],
+      "title": "Salão: aberta ou fechada",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "indexByName": {
+              "10A": 10,
+              "11A": 11,
+              "12A": 12,
+              "1A": 1,
+              "1B": 13,
+              "2A": 2,
+              "2B": 14,
+              "3A": 3,
+              "3B": 15,
+              "4A": 4,
+              "4B": 16,
+              "5A": 5,
+              "5B": 17,
+              "6A": 6,
+              "6B": 18,
+              "7A": 7,
+              "7B": 19,
+              "8A": 8,
+              "8B": 20,
+              "9A": 9,
+              "9B": 21,
+              "Time": 0,
+              "_time": 0
+            }
+          }
+        }
+      ],
+      "type": "state-timeline"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "influxdb"
+      },
+      "description": "Sensores fora do salão. Os antigos aparecem como indisponíveis até serem trocados.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "#6e7581",
+            "mode": "fixed"
+          },
+          "custom": {
+            "fillOpacity": 80,
+            "lineWidth": 0
+          },
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "color": "#6e7581",
+                  "index": 0,
+                  "text": "Fechada"
+                },
+                "1": {
+                  "color": "#FF9830",
+                  "index": 1,
+                  "text": "Aberta"
+                },
+                "2": {
+                  "color": "#8AB8FF",
+                  "index": 2,
+                  "text": "Indisponível"
+                }
+              },
+              "type": "value"
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 19
+      },
+      "id": 5,
+      "options": {
+        "alignValue": "left",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "mergeValues": true,
+        "rowHeight": 0.85,
+        "showValue": "never",
+        "tooltip": {
+          "mode": "single"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb"
+          },
+          "query": "// Estado de cada janela/porta: 1 = aberta, 0 = fechada, 2 = indisponível (sensor fora do ar).\n// O Home Assistant publica todas a cada 10 min e sempre que alguma muda.\nimport \"date\"\npasso = if int(v: v.windowPeriod) > int(v: 5m) then v.windowPeriod else 5m\nfrom(bucket: \"LabEEE\")\n  |> range(start: date.sub(d: 1h, from: v.timeRangeStart), stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"janela\" and (r._field == \"aberta\" or r._field == \"disponivel\"))\n  |> filter(fn: (r) => r.nome !~ /^(1[0-2]|[1-9])A$|^[1-9]B$/)\n  |> group(columns: [\"nome\", \"_field\"])\n  |> aggregateWindow(every: passo, fn: last, createEmpty: true)\n  |> fill(usePrevious: true)\n  |> filter(fn: (r) => r._time >= v.timeRangeStart and exists r._value)\n  |> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> map(fn: (r) => ({_time: r._time, nome: r.nome, _value: if r.disponivel == 0.0 then 2.0 else r.aberta}))\n  |> group()\n  |> pivot(rowKey: [\"_time\"], columnKey: [\"nome\"], valueColumn: \"_value\")",
+          "refId": "A"
+        }
+      ],
+      "title": "Outras salas (sensores em troca)",
+      "transformations": [],
+      "type": "state-timeline"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "influxdb"
+      },
+      "description": "Última leitura de bateria de cada sensor do salão. Abaixo de 20% é hora de trocar.",
+      "fieldConfig": {
+        "defaults": {
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 20
+              },
+              {
+                "color": "green",
+                "value": 40
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 29
+      },
+      "id": 6,
+      "options": {
+        "displayMode": "basic",
+        "minVizHeight": 16,
+        "minVizWidth": 8,
+        "namePlacement": "auto",
+        "orientation": "vertical",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "sizing": "auto",
+        "valueMode": "color"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb"
+          },
+          "query": "from(bucket: \"LabEEE\")\n  |> range(start: -1d)\n  |> filter(fn: (r) => r._measurement == \"janela\" and r._field == \"bateria\")\n  |> filter(fn: (r) => r.nome =~ /^(1[0-2]|[1-9])A$|^[1-9]B$/)\n  |> group(columns: [\"nome\"]) |> last() |> group()\n  |> map(fn: (r) => ({k: \"agora\", nome: r.nome, _value: float(v: r._value)}))\n  |> pivot(rowKey: [\"k\"], columnKey: [\"nome\"], valueColumn: \"_value\") |> drop(columns: [\"k\"])",
+          "refId": "A"
+        }
+      ],
+      "title": "Bateria (salão)",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "indexByName": {
+              "10A": 10,
+              "11A": 11,
+              "12A": 12,
+              "1A": 1,
+              "1B": 13,
+              "2A": 2,
+              "2B": 14,
+              "3A": 3,
+              "3B": 15,
+              "4A": 4,
+              "4B": 16,
+              "5A": 5,
+              "5B": 17,
+              "6A": 6,
+              "6B": 18,
+              "7A": 7,
+              "7B": 19,
+              "8A": 8,
+              "8B": 20,
+              "9A": 9,
+              "9B": 21,
+              "Time": 0,
+              "_time": 0
+            }
+          }
+        }
+      ],
+      "type": "bargauge"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "influxdb"
+      },
+      "description": "linkquality do zigbee2mqtt (0–255). Valores baixos e quedas frequentes indicam sensor longe do coordenador ou repetidor.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 0,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": true
+          },
+          "displayName": "${__field.labels.sensor}",
+          "max": 255,
+          "min": 0
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 29
+      },
+      "id": 7,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "min"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb"
+          },
+          "query": "import \"strings\"\nfrom(bucket: \"LabEEE\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"zigbee\" and r._field == \"linkquality\")\n  |> map(fn: (r) => ({_time: r._time, _value: float(v: r._value), sensor: strings.trimPrefix(v: r.topic, prefix: \"zigbee2mqtt/\")}))\n  |> filter(fn: (r) => r.sensor =~ /^(1[0-2]|[1-9])A$|^[1-9]B$/)\n  |> group(columns: [\"sensor\"])\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)",
+          "refId": "A"
+        }
+      ],
+      "title": "Qualidade do sinal (salão)",
+      "type": "timeseries"
+    }
+  ],
+  "preload": false,
+  "refresh": "1m",
+  "schemaVersion": 42,
+  "tags": [
+    "gemeo-digital",
+    "labeee"
+  ],
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": [
+      "5s",
+      "10s",
+      "30s",
+      "1m",
+      "5m",
+      "15m",
+      "30m",
+      "1h",
+      "2h",
+      "1d"
+    ]
+  },
+  "timezone": "browser",
+  "title": "LabEEE — Portas e janelas",
+  "uid": "ad8ksnn"
+}

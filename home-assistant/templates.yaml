@@ -1,0 +1,337 @@
+- binary_sensor:
+  - name: "PC 11"
+    unique_id: presenca_pc_11_pec
+    device_class: running
+    icon: mdi:desktop-classic
+    state: >
+      {{ states('switch.sonoff_11') in ['on', 'off'] }}
+
+  - name: "PC 12"
+    unique_id: presenca_pc_12_pec
+    device_class: running
+    icon: mdi:desktop-classic
+    state: >
+      {{ states('switch.sonoff_12') in ['on', 'off'] }}
+
+  - name: "PC 13"
+    unique_id: presenca_pc_13_pec
+    device_class: running
+    icon: mdi:desktop-classic
+    state: >
+      {{ states('switch.sonoff_13') in ['on', 'off'] }}
+
+  - name: "PC 14"
+    unique_id: presenca_pc_14_pec
+    device_class: running
+    icon: mdi:desktop-classic
+    state: >
+      {{ states('switch.sonoff_14') in ['on', 'off'] }}
+
+  - name: "PC 15"
+    unique_id: presenca_pc_15_pec
+    device_class: running
+    icon: mdi:desktop-classic
+    state: >
+      {{ states('switch.sonoff_15') in ['on', 'off'] }}
+
+  - name: "PC 16"
+    unique_id: presenca_pc_16_pec
+    device_class: running
+    icon: mdi:desktop-classic
+    state: >
+      {{ states('switch.sonoff_16') in ['on', 'off'] }}
+
+  - name: "PC 17"
+    unique_id: presenca_pc_17_pec
+    device_class: running
+    icon: mdi:desktop-classic
+    state: >
+      {{ states('switch.sonoff_17') in ['on', 'off'] }}
+
+  - name: "PC 21"
+    unique_id: presenca_pc_21_pec
+    device_class: running
+    icon: mdi:desktop-classic
+    state: >
+      {{ states('switch.sonoff_21') in ['on', 'off'] }}
+
+  - name: "PC 22"
+    unique_id: presenca_pc_22_pec
+    device_class: running
+    icon: mdi:desktop-classic
+    state: >
+      {{ states('switch.sonoff_22') in ['on', 'off'] }}
+
+  - name: "PC 23"
+    unique_id: presenca_pc_23_pec
+    device_class: running
+    icon: mdi:desktop-classic
+    state: >
+      {{ states('switch.sonoff_23') in ['on', 'off'] }}
+
+  - name: "PC 24"
+    unique_id: presenca_pc_24_pec
+    device_class: running
+    icon: mdi:desktop-classic
+    state: >
+      {{ states('switch.sonoff_24') in ['on', 'off'] }}
+
+  - name: "PC 25"
+    unique_id: presenca_pc_25_pec
+    device_class: running
+    icon: mdi:desktop-classic
+    state: >
+      {{ states('switch.sonoff_25') in ['on', 'off'] }}
+
+  - name: "PC 26"
+    unique_id: presenca_pc_26_pec
+    device_class: running
+    icon: mdi:desktop-classic
+    state: >
+      {{ states('switch.sonoff_26') in ['on', 'off'] }}
+
+  - name: "PC 27"
+    unique_id: presenca_pc_27_pec
+    device_class: running
+    icon: mdi:desktop-classic
+    state: >
+      {{ states('switch.sonoff_27') in ['on', 'off'] }}
+
+  - name: "PC 31"
+    unique_id: presenca_pc_31_pec
+    device_class: running
+    icon: mdi:desktop-classic
+    state: >
+      {{ states('switch.sonoff_31') in ['on', 'off'] }}
+
+  - name: "PC 32"
+    unique_id: presenca_pc_32_pec
+    device_class: running
+    icon: mdi:desktop-classic
+    state: >
+      {{ states('switch.sonoff_32') in ['on', 'off'] }}
+
+  - name: "PC 33"
+    unique_id: presenca_pc_33_pec
+    device_class: running
+    icon: mdi:desktop-classic
+    state: >
+      {{ states('switch.sonoff_33') in ['on', 'off'] }}
+
+  - name: "PC 34"
+    unique_id: presenca_pc_34_pec
+    device_class: running
+    icon: mdi:desktop-classic
+    state: >
+      {{ states('switch.sonoff_34') in ['on', 'off'] }}
+
+  - name: "PC 35"
+    unique_id: presenca_pc_35_pec
+    device_class: running
+    icon: mdi:desktop-classic
+    state: >
+      {{ states('switch.sonoff_35') in ['on', 'off'] }}
+
+  - name: "PC 36"
+    unique_id: presenca_pc_36_pec
+    device_class: running
+    icon: mdi:desktop-classic
+    state: >
+      {{ states('switch.sonoff_36') in ['on', 'off'] }}
+
+  - name: "PC 37"
+    unique_id: presenca_pc_37_pec
+    device_class: running
+    icon: mdi:desktop-classic
+    state: >
+      {{ states('switch.sonoff_37') in ['on', 'off'] }}
+
+  - name: "PC 41"
+    unique_id: presenca_pc_41_pec
+    device_class: running
+    icon: mdi:desktop-classic
+    state: >
+      {{ states('switch.sonoff_41') in ['on', 'off'] }}
+
+  - name: "PC 42"
+    unique_id: presenca_pc_42_pec
+    device_class: running
+    icon: mdi:desktop-classic
+    state: >
+      {{ states('switch.sonoff_42') in ['on', 'off'] }}
+
+  - name: "PC 43"
+    unique_id: presenca_pc_43_pec
+    device_class: running
+    icon: mdi:desktop-classic
+    state: >
+      {{ states('switch.sonoff_43') in ['on', 'off'] }}
+
+  - name: "PC 44"
+    unique_id: presenca_pc_44_pec
+    device_class: running
+    icon: mdi:desktop-classic
+    state: >
+      {{ states('switch.sonoff_44') in ['on', 'off'] }}
+
+  - name: "PC 45"
+    unique_id: presenca_pc_45_pec
+    device_class: running
+    icon: mdi:desktop-classic
+    state: >
+      {{ states('switch.sonoff_45') in ['on', 'off'] }}
+
+  - name: "PC 46"
+    unique_id: presenca_pc_46_pec
+    device_class: running
+    icon: mdi:desktop-classic
+    state: >
+      {{ states('switch.sonoff_46') in ['on', 'off'] }}
+
+  - name: "PC 47"
+    unique_id: presenca_pc_47_pec
+    device_class: running
+    icon: mdi:desktop-classic
+    state: >
+      {{ states('switch.sonoff_47') in ['on', 'off'] }}
+
+  - name: "PC 51"
+    unique_id: presenca_pc_51_pec
+    device_class: running
+    icon: mdi:desktop-classic
+    state: >
+      {{ states('switch.sonoff_51') in ['on', 'off'] }}
+
+  - name: "PC 52"
+    unique_id: presenca_pc_52_pec
+    device_class: running
+    icon: mdi:desktop-classic
+    state: >
+      {{ states('switch.sonoff_52') in ['on', 'off'] }}
+
+  - name: "PC 53"
+    unique_id: presenca_pc_53_pec
+    device_class: running
+    icon: mdi:desktop-classic
+    state: >
+      {{ states('switch.sonoff_53') in ['on', 'off'] }}
+
+  - name: "PC 54"
+    unique_id: presenca_pc_54_pec
+    device_class: running
+    icon: mdi:desktop-classic
+    state: >
+      {{ states('switch.sonoff_54') in ['on', 'off'] }}
+
+  - name: "PC 61"
+    unique_id: presenca_pc_61_pec
+    device_class: running
+    icon: mdi:desktop-classic
+    state: >
+      {{ states('switch.sonoff_61') in ['on', 'off'] }}
+
+  - name: "PC 62"
+    unique_id: presenca_pc_62_pec
+    device_class: running
+    icon: mdi:desktop-classic
+    state: >
+      {{ states('switch.sonoff_62') in ['on', 'off'] }}
+
+  - name: "PC 63"
+    unique_id: presenca_pc_63_pec
+    device_class: running
+    icon: mdi:desktop-classic
+    state: >
+      {{ states('switch.sonoff_63') in ['on', 'off'] }}
+
+  - name: "PC 64"
+    unique_id: presenca_pc_64_pec
+    device_class: running
+    icon: mdi:desktop-classic
+    state: >
+      {{ states('switch.sonoff_64') in ['on', 'off'] }}
+
+
+- sensor:
+  - name: "Total PCs Conectados"
+    unique_id: total_pcs_conectados_lab
+    icon: mdi:desktop-classic
+    state_class: measurement
+    unit_of_measurement: "PCs"
+    state: >
+      {% set pecs = [
+        'switch.sonoff_11', 'switch.sonoff_12', 'switch.sonoff_13', 'switch.sonoff_14', 'switch.sonoff_15', 'switch.sonoff_16', 'switch.sonoff_17',
+        'switch.sonoff_21', 'switch.sonoff_22', 'switch.sonoff_23', 'switch.sonoff_24', 'switch.sonoff_25', 'switch.sonoff_26', 'switch.sonoff_27',
+        'switch.sonoff_31', 'switch.sonoff_32', 'switch.sonoff_33', 'switch.sonoff_34', 'switch.sonoff_35', 'switch.sonoff_36', 'switch.sonoff_37',
+        'switch.sonoff_41', 'switch.sonoff_42', 'switch.sonoff_43', 'switch.sonoff_44', 'switch.sonoff_45', 'switch.sonoff_46', 'switch.sonoff_47',
+        'switch.sonoff_51', 'switch.sonoff_52', 'switch.sonoff_53', 'switch.sonoff_54',
+        'switch.sonoff_61', 'switch.sonoff_62', 'switch.sonoff_63', 'switch.sonoff_64'
+      ] %}
+      {{ pecs | reject('is_state', 'unavailable') | reject('is_state', 'unknown') | list | count }}
+
+- sensor:
+    - name: "Temperatura Média Lab"
+      unique_id: lab_temp_media
+      unit_of_measurement: "°C"
+      device_class: temperature
+      state_class: measurement
+      state: >
+        {% set ids = [
+          'sensor.onset20589702','sensor.onset20589706','sensor.onset20589709',
+          'sensor.onset20589716','sensor.onset20589717','sensor.onset20589721',
+          'sensor.onset20589722','sensor.onset20589725','sensor.onset20589729',
+          'sensor.onset20589732','sensor.onset20589733','sensor.onset20589738',
+          'sensor.onset20589744','sensor.onset20589761',
+          'sensor.onset20590558','sensor.onset20590559','sensor.onset20590561',
+          'sensor.onset20590562','sensor.onset20590564'] %}
+        {% set ns = namespace(v=[]) %}
+        {% for s in expand(ids) %}
+          {% if s.attributes.Temperature is defined and (now() - s.last_updated).total_seconds() < 1800 %}
+            {% set ns.v = ns.v + [s.attributes.Temperature | float] %}
+          {% endif %}
+        {% endfor %}
+        {{ (ns.v | sum / ns.v | length) | round(2) if ns.v else none }}
+
+    - name: "Temperatura Máxima Lab"
+      unique_id: lab_temp_max
+      unit_of_measurement: "°C"
+      device_class: temperature
+      state_class: measurement
+      state: >
+        {% set ids = [
+          'sensor.onset20589702','sensor.onset20589706','sensor.onset20589709',
+          'sensor.onset20589716','sensor.onset20589717','sensor.onset20589721',
+          'sensor.onset20589722','sensor.onset20589725','sensor.onset20589729',
+          'sensor.onset20589732','sensor.onset20589733','sensor.onset20589738',
+          'sensor.onset20589744','sensor.onset20589761',
+          'sensor.onset20590558','sensor.onset20590559','sensor.onset20590561',
+          'sensor.onset20590562','sensor.onset20590564'] %}
+        {% set ns = namespace(v=[]) %}
+        {% for s in expand(ids) %}
+          {% if s.attributes.Temperature is defined and (now() - s.last_updated).total_seconds() < 1800 %}
+            {% set ns.v = ns.v + [s.attributes.Temperature | float] %}
+          {% endif %}
+        {% endfor %}
+        {{ ns.v | max if ns.v else none }}
+
+    - name: "Temperatura Mínima Lab"
+      unique_id: lab_temp_min
+      unit_of_measurement: "°C"
+      device_class: temperature
+      state_class: measurement
+      state: >
+        {% set ids = [
+          'sensor.onset20589702','sensor.onset20589706','sensor.onset20589709',
+          'sensor.onset20589716','sensor.onset20589717','sensor.onset20589721',
+          'sensor.onset20589722','sensor.onset20589725','sensor.onset20589729',
+          'sensor.onset20589732','sensor.onset20589733','sensor.onset20589738',
+          'sensor.onset20589744','sensor.onset20589761',
+          'sensor.onset20590558','sensor.onset20590559','sensor.onset20590561',
+          'sensor.onset20590562','sensor.onset20590564'] %}
+        {% set ns = namespace(v=[]) %}
+        {% for s in expand(ids) %}
+          {% if s.attributes.Temperature is defined and (now() - s.last_updated).total_seconds() < 1800 %}
+            {% set ns.v = ns.v + [s.attributes.Temperature | float] %}
+          {% endif %}
+        {% endfor %}
+        {{ ns.v | min if ns.v else none }}

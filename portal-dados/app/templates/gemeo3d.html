@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LabEEE — Gêmeo Digital 3D</title>
+<style>
+  :root { --bg:#111217; --card:#181b1fee; --tx:#e6e8eb; --mut:#9aa3af; --bd:#2c3038; --ac:#5794f2; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--tx); font:14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; overflow:hidden; }
+  #cena { position:fixed; inset:0; }
+  .barra { position:fixed; top:0; left:0; right:0; display:flex; gap:12px; align-items:center; flex-wrap:wrap; padding:10px 14px; background:linear-gradient(#111217f2,#11121700); pointer-events:none; }
+  .barra > * { pointer-events:auto; }
+  h1 { font-size:17px; margin:0 8px 0 0; }
+  .status { font-size:12px; color:var(--mut); }
+  .status b { color:#73BF69; }
+  .status.velho b { color:#FF9830; }
+  .ctrl { display:flex; gap:6px; flex-wrap:wrap; margin-left:auto; }
+  .ctrl button, .ctrl a { font:inherit; font-size:12.5px; background:#22252b; color:var(--tx); border:1px solid var(--bd); border-radius:7px; padding:5px 10px; cursor:pointer; text-decoration:none; }
+  .ctrl button[aria-pressed="true"] { background:#1d2a40; border-color:var(--ac); color:#9cc2ff; }
+  .legenda { position:fixed; left:12px; bottom:12px; background:var(--card); border:1px solid var(--bd); border-radius:10px; padding:10px 12px; font-size:12px; max-width:min(330px, calc(100vw - 24px)); }
+  .legenda div { display:flex; align-items:center; gap:6px; margin:2px 0; flex-wrap:wrap; }
+  .legenda b { width:96px; flex:none; }
+  .sw { display:inline-block; width:12px; height:12px; border-radius:3px; margin-right:2px; vertical-align:-2px; }
+  #info { position:fixed; right:12px; top:62px; width:min(320px, calc(100vw - 24px)); background:var(--card); border:1px solid var(--bd); border-radius:10px; padding:12px 14px; display:none; }
+  #info h2 { font-size:15px; margin:0 0 6px; }
+  #info table { width:100%; border-collapse:collapse; font-size:13px; }
+  #info td { padding:3px 0; border-bottom:1px solid var(--bd); }
+  #info td:last-child { text-align:right; font-variant-numeric:tabular-nums; }
+  #info a { color:var(--ac); font-size:12.5px; }
+  #info .x { float:right; cursor:pointer; color:var(--mut); }
+  #carregando { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:10px; color:var(--mut); }
+  #carregando .bar { width:240px; height:6px; background:#22252b; border-radius:3px; overflow:hidden; }
+  #carregando .bar i { display:block; height:100%; width:0; background:var(--ac); transition:width .2s; }
+  #erro { color:#f97066; max-width:520px; text-align:center; }
+  #dica { position:fixed; pointer-events:none; background:#000c; color:#fff; font-size:12px; padding:3px 7px; border-radius:5px; display:none; white-space:nowrap; }
+</style>
+<script>
+  window.GEMEO_CONFIG = { ifc: "gemeo3d/Labeee_gemeo.ifc", cozido: "gemeo3d/Labeee_gemeo.bin.gz", estado: "gemeo3d/estado.json",
+                          grafana: "{{ grafana }}", mock: {{ 'true' if simulado else 'false' }} };
+</script>
+<script type="importmap">
+{ "imports": {
+  "three": "./static/vendor/three.module.js",
+  "three/addons/controls/OrbitControls.js": "./static/vendor/OrbitControls.js",
+  "web-ifc": "./static/vendor/web-ifc-api.js",
+  "cozinhar": "./static/cozinhar.mjs"
+} }
+</script>
+</head>
+<body>
+<div id="cena"></div>
+<div class="barra">
+  <h1>LabEEE — Gêmeo Digital 3D</h1>
+  <span class="status" id="status">carregando…</span>
+  <div class="ctrl">
+    <button id="bTemp" aria-pressed="true">Temperatura</button>
+    <button id="bCo2" aria-pressed="false">CO₂</button>
+    <button id="bVista">Vista inicial</button>
+    <a id="bGrafana" target="_blank" rel="noopener">Grafana ↗</a>
+  </div>
+</div>
+<div class="legenda" id="legenda"></div>
+<div id="info"></div>
+<div id="dica"></div>
+<div id="carregando"><div id="msg">Baixando o modelo do lab…</div><div class="bar"><i id="prog"></i></div><div id="erro"></div></div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { cozinhar, empacotar, desempacotar } from 'cozinhar';
+
+const CFG = Object.assign({ ifc: 'Labeee_gemeo.ifc', estado: 'estado.json', grafana: '', intervalo: 5000, mock: false }, window.GEMEO_CONFIG || {});
+const $ = s => document.querySelector(s);
+$('#bGrafana').href = CFG.grafana || '#';
+
+// ------------------------------------------------------------------ cores (as mesmas dos painéis do Grafana)
+const COR = {
+  ocupada: 0xFADE2A, aberta: 0xFF9830, fechada: 0x6e7581, indisponivel: 0x8AB8FF,
+  ligado: 0x5794F2, desligado: 0x9aa3af, semdado: 0x555a64,
+};
+const corTemp = t => t == null ? COR.semdado : t < 20 ? 0x5794F2 : t < 25 ? 0x73BF69 : t < 27 ? 0xFF9830 : 0xF2495C;
+const corCo2 = c => c == null ? COR.semdado : c < 800 ? 0x73BF69 : c < 1000 ? 0xFADE2A : 0xF2495C;
+const hex = c => '#' + c.toString(16).padStart(6, '0');
+
+function legenda() {
+  const sw = c => `<span class="sw" style="background:${hex(c)}"></span>`;
+  $('#legenda').innerHTML = `
+   <div><b>Mesas</b>${sw(COR.ocupada)}PC em execução ${sw(0xb9a27f)}vazia</div>
+   <div><b>Janelas/portas</b>${sw(COR.aberta)}aberta ${sw(COR.fechada)}fechada ${sw(COR.indisponivel)}sem sinal</div>
+   <div><b>Ar-condicionado</b>${sw(COR.ligado)}ligado ${sw(COR.desligado)}desligado</div>
+   ${modo === 'temp'
+     ? `<div><b>HOBO (°C)</b>${sw(0x5794F2)}&lt;20 ${sw(0x73BF69)}20–25 ${sw(0xFF9830)}25–27 ${sw(0xF2495C)}≥27</div>`
+     : `<div><b>HOBO CO₂ (ppm)</b>${sw(0x73BF69)}&lt;800 ${sw(0xFADE2A)}800–1000 ${sw(0xF2495C)}≥1000</div>`}
+   <div style="color:#9aa3af">Arraste para girar · roda para zoom · clique num objeto para ver os valores</div>`;
+}
+let modo = 'temp';
+
+// ------------------------------------------------------------------ cena
+const cena = new THREE.Scene();
+cena.background = new THREE.Color(0x111217);
+const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.1, 500);
+const render = new THREE.WebGLRenderer({ antialias: true });
+render.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+render.setSize(innerWidth, innerHeight);
+$('#cena').appendChild(render.domElement);
+const controles = new OrbitControls(camera, render.domElement);
+controles.enableDamping = true;
+cena.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1.6));
+const sol = new THREE.DirectionalLight(0xffffff, 1.4); sol.position.set(30, 60, 20); cena.add(sol);
+let sujo = true; const pedeRender = () => { sujo = true; };
+controles.addEventListener('change', pedeRender);
+addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); render.setSize(innerWidth, innerHeight); pedeRender(); });
+
+// ------------------------------------------------------------------ carregar o modelo
+// O servidor entrega o modelo já "cozido" (Labeee_gemeo.bin.gz, gerado no build): só malhas leves,
+// juntadas por material. Se ele não existir, a página lê o IFC e cozinha aqui mesmo (bem mais lento).
+const objetos = new Map();      // expressID -> {tipo, nome, malhas:[...]}
+const porNome = { mesa: {}, janela: {}, porta: {}, hobo: {}, daikin: {}, sala: {} };
+const estaticos = { base: [], teto: [] };
+const interativos = [];          // malhas que respondem ao mouse
+const tempos = {}; let _t = performance.now(); const marca = k => { const a = performance.now(); tempos[k] = Math.round(a - _t); _t = a; };
+
+async function baixar(url, p0, p1) {
+  const r = await fetch(url, { credentials: 'same-origin' });
+  if (!r.ok) return null;
+  const total = +r.headers.get('content-length') || 0, leitor = r.body.getReader(), partes = []; let lido = 0;
+  for (;;) { const { done, value } = await leitor.read(); if (done) break; partes.push(value); lido += value.length; if (total) $('#prog').style.width = (p0 + (p1 - p0) * lido / total) + '%'; }
+  const u = new Uint8Array(lido); let o = 0; for (const p of partes) { u.set(p, o); o += p.length; }
+  return u;
+}
+
+async function pacoteDoIFC() {
+  $('#msg').textContent = 'Lendo o IFC direto (primeira vez pode levar 1–2 min)…';
+  const dados = await baixar(CFG.ifc, 0, 40);
+  if (!dados) throw new Error('Modelo 3D não encontrado no servidor (veja portal-dados/modelo/LEIAME.md)');
+  const WebIFC = await import('web-ifc');
+  const api = new WebIFC.IfcAPI();
+  api.SetWasmPath(new URL('static/vendor/', location.href).href, true);
+  try { await api.Init(undefined, true); } catch (e) { throw new Error('motor web-ifc: ' + e.message); }
+  await new Promise(r => setTimeout(r, 30));
+  const modelo = api.OpenModel(dados, { COORDINATE_TO_ORIGIN: true });
+  const res = cozinhar(WebIFC, api, modelo);
+  api.CloseModel(modelo);
+  return desempacotar(empacotar(res).buffer);
+}
+
+function monta({ meta, bufs }) {
+  const mats = meta.materiais.map(([r, g, b, a]) => new THREE.MeshLambertMaterial({ color: new THREE.Color(r, g, b), transparent: a < 0.99, opacity: a, side: THREE.DoubleSide, depthWrite: a >= 0.99 }));
+  const geo = m => {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(bufs[m.pos], 3));
+    g.setAttribute('normal', new THREE.BufferAttribute(bufs[m.nor], 3, true));
+    g.setIndex(new THREE.BufferAttribute(bufs[m.idx], 1));
+    return g;
+  };
+  for (const m of meta.estaticos) {
+    const ms = new THREE.Mesh(geo(m), mats[m.mat]); ms.matrixAutoUpdate = false; ms.visible = m.cat !== 'teto';
+    estaticos[m.cat].push(ms); cena.add(ms);
+  }
+  for (const o of meta.objetos) {
+    const obj = { id: o.id, tipo: o.tipo, nome: o.nome, malhas: [] };
+    for (const m of o.malhas) {
+      const mat = m.mat < 0 ? matSala : mats[m.mat];
+      const ms = new THREE.Mesh(geo(m), mat); ms.matrixAutoUpdate = false;
+      ms.userData.id = o.id; ms.userData.matOriginal = mat; obj.malhas.push(ms); cena.add(ms); interativos.push(ms);
+    }
+    objetos.set(o.id, obj);
+    const nm = o.nome;
+    if (o.tipo === 'IFCFURNITURE') porNome.mesa[nm.slice(5)] = obj;
+    else if (o.tipo === 'IFCWINDOW') porNome.janela[nm] = obj;
+    else if (o.tipo === 'IFCDOOR') porNome.porta[nm] = obj;
+    else if (o.tipo === 'IFCSENSOR') porNome.hobo[nm] = obj;
+    else if (o.tipo === 'IFCUNITARYEQUIPMENT') porNome.daikin[nm.replace('Daikin ', '')] = obj;
+    else if (o.tipo === 'IFCSPACE') { porNome.sala[nm] = obj; for (const m of obj.malhas) m.visible = false; }
+  }
+}
+
+async function carregar() {
+  let pacote = null, origem = 'cozido';
+  try {
+    const gz = await baixar(CFG.cozido, 0, 90);
+    if (gz) pacote = desempacotar(await new Response(new Blob([gz]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
+  } catch (e) { console.warn('modelo cozido indisponível', e); }
+  marca('baixar');
+  if (!pacote) { origem = 'ifc'; pacote = await pacoteDoIFC(); marca('ifc'); }
+  monta(pacote); marca('montar');
+  criarMarcadores();
+  vistaInicial();
+  let tri = 0; cena.traverse(x => { if (x.isMesh && x.geometry.index) tri += x.geometry.index.count / 3; });
+  window.__info = { origem, triangulos: tri, malhas: cena.children.length, tempos };
+  $('#carregando').style.display = 'none';
+  pedeRender();
+}
+const matSala = new THREE.MeshBasicMaterial({ color: 0x5794F2, transparent: true, opacity: 0.08, depthWrite: false, side: THREE.DoubleSide });
+
+// ------------------------------------------------------------------ marcadores dos HOBO (bolinha + valor)
+const marcadores = {};
+function caixaDe(obj) { const b = new THREE.Box3(); for (const m of obj.malhas) b.expandByObject(m); return b; }
+function rotulo() {
+  const c = document.createElement('canvas'); c.width = 256; c.height = 96;
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
+  sp.scale.set(0.9, 0.34, 1); sp.renderOrder = 10; sp.userData.canvas = c; return sp;
+}
+function escreve(sp, texto, cor) {
+  const c = sp.userData.canvas, g = c.getContext('2d');
+  g.clearRect(0, 0, c.width, c.height);
+  g.fillStyle = hex(cor); roundRect(g, 4, 10, 248, 76, 18); g.fill();
+  g.fillStyle = (cor === 0xFADE2A || cor === 0x73BF69) ? '#111' : '#fff';
+  g.font = 'bold 46px system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText(texto, 128, 50); sp.material.map.needsUpdate = true;
+}
+function roundRect(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
+function criarMarcadores() {
+  for (const [serie, obj] of Object.entries(porNome.hobo)) {
+    const b = caixaDe(obj), c = b.getCenter(new THREE.Vector3());
+    const bola = new THREE.Mesh(new THREE.SphereGeometry(0.11, 20, 14), new THREE.MeshLambertMaterial({ color: COR.semdado }));
+    bola.position.set(c.x, b.max.y + 0.12, c.z); bola.userData.id = obj.id;
+    const sp = rotulo(); sp.position.set(c.x, b.max.y + 0.45, c.z); sp.userData.id = obj.id;
+    cena.add(bola); cena.add(sp); interativos.push(bola, sp);
+    marcadores[serie] = { bola, sp, obj };
+  }
+}
+
+// ------------------------------------------------------------------ câmera
+function vistaInicial() {
+  const alvo = porNome.sala['Salão'] || [...objetos.values()].find(o => o.tipo === 'IFCSPACE');
+  const caixa = alvo ? caixaDe(alvo) : new THREE.Box3().setFromObject(cena);
+  pedeRender();
+  const c = caixa.getCenter(new THREE.Vector3()), s = caixa.getSize(new THREE.Vector3());
+  const d = Math.max(s.x, s.z) * 1.05;
+  controles.target.copy(c);
+  camera.position.set(c.x + d * 0.55, c.y + d * 0.95, c.z + d * 0.75);
+  controles.update();
+}
+
+// ------------------------------------------------------------------ estado ao vivo
+let estado = null;
+const mats = {};
+const mat = c => mats[c] || (mats[c] = new THREE.MeshLambertMaterial({ color: c, side: THREE.DoubleSide }));
+function pinta(obj, cor) { if (!obj) return; for (const m of obj.malhas) m.material = cor == null ? m.userData.matOriginal : mat(cor); pedeRender(); }
+const velho = x => !x || x.idade_min == null || x.idade_min > 30;
+
+function aplicar() {
+  if (!estado) return;
+  for (const [mesa, obj] of Object.entries(porNome.mesa)) {
+    const e = estado.mesas[mesa]; pinta(obj, velho(e) ? COR.semdado : e.ocupada ? COR.ocupada : null);
+  }
+  for (const [nome, obj] of [...Object.entries(porNome.janela), ...Object.entries(porNome.porta)]) {
+    const e = estado.janelas[nome];
+    pinta(obj, !e ? null : (velho(e) || !e.disponivel) ? COR.indisponivel : e.aberta ? COR.aberta : COR.fechada);
+  }
+  for (const [u, obj] of Object.entries(porNome.daikin)) {
+    const e = estado.daikin[u]; pinta(obj, velho(e) ? COR.semdado : e.ligado ? COR.ligado : COR.desligado);
+  }
+  for (const [serie, mk] of Object.entries(marcadores)) {
+    const e = estado.hobo[serie]; const co2 = serie.startsWith('20590');
+    let cor, txt;
+    if (velho(e)) { cor = COR.semdado; txt = 'sem dado'; }
+    else if (modo === 'co2' && co2) { cor = corCo2(e.co2_ppm); txt = e.co2_ppm != null ? Math.round(e.co2_ppm) + ' ppm' : 'sem dado'; }
+    else { cor = corTemp(e.temp_c); txt = e.temp_c != null ? e.temp_c.toFixed(1) + ' °C' : 'sem dado'; }
+    mk.bola.material.color.setHex(cor);
+    mk.sp.visible = modo === 'temp' || co2;
+    mk.bola.visible = mk.sp.visible;
+    escreve(mk.sp, txt, cor);
+  }
+  const hora = new Date(estado.hora);
+  const atraso = (Date.now() - hora) / 1000;
+  $('#status').className = 'status' + (atraso > 60 ? ' velho' : '');
+  $('#status').innerHTML = `<b>●</b> ${atraso > 60 ? 'sem atualização desde' : 'ao vivo ·'} ${hora.toLocaleTimeString('pt-BR')}${CFG.mock ? ' · DADOS SIMULADOS' : ''}`;
+  if (selecionado) mostraInfo(selecionado);
+  pedeRender();
+}
+async function buscar() {
+  try {
+    estado = CFG.mock ? simula() : await (await fetch(CFG.estado, { credentials: 'same-origin', cache: 'no-store' })).json();
+    aplicar();
+  } catch (e) { $('#status').className = 'status velho'; $('#status').innerHTML = '<b>●</b> sem conexão com o servidor (tentando de novo)'; }
+}
+
+// ------------------------------------------------------------------ dados simulados (só na página de teste)
+let sim = null;
+function simula() {
+  const r = Math.random;
+  if (!sim) {
+    sim = { mesas: {}, janelas: {}, daikin: {}, hobo: {} };
+    for (const m of Object.keys(porNome.mesa)) sim.mesas[m] = { ocupada: r() < .4 ? 1 : 0, idade_min: 1 };
+    for (const j of [...Object.keys(porNome.janela), ...Object.keys(porNome.porta)]) sim.janelas[j] = { aberta: r() < .3 ? 1 : 0, disponivel: r() < .9 ? 1 : 0, idade_min: 1 };
+    for (const u of Object.keys(porNome.daikin)) sim.daikin[u] = { ligado: r() < .4 ? 1 : 0, setpoint: 24, temp_retorno: 24 + r() * 2, modo: 'cool', idade_min: 1 };
+    for (const s of Object.keys(porNome.hobo)) sim.hobo[s] = { temp_c: 22 + r() * 6, ur_pct: 55 + r() * 15, co2_ppm: s.startsWith('20590') ? 450 + r() * 700 : null, idade_min: s === '20589761' ? 999 : 2 };
+  } else {
+    const ks = Object.keys(sim.mesas); const k = ks[Math.floor(r() * ks.length)]; sim.mesas[k].ocupada ^= 1;
+    const js = Object.keys(sim.janelas); const j = js[Math.floor(r() * js.length)]; sim.janelas[j].aberta ^= 1;
+    for (const s of Object.values(sim.hobo)) { s.temp_c += (r() - .5) * .2; if (s.co2_ppm) s.co2_ppm += (r() - .5) * 30; }
+  }
+  return { hora: new Date().toISOString(), ...sim };
+}
+
+// ------------------------------------------------------------------ clique / informações
+const ray = new THREE.Raycaster(); const ptr = new THREE.Vector2();
+let selecionado = null, desceu = null;
+function alvo(ev) {
+  const r = render.domElement.getBoundingClientRect();
+  ptr.set(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1);
+  ray.setFromCamera(ptr, camera);
+  const hits = ray.intersectObjects(interativos.filter(o => o.visible), false);
+  for (const h of hits) { const o = objetos.get(h.object.userData.id); if (o && descreve(o)) return o; }
+  return null;
+}
+render.domElement.addEventListener('pointerdown', e => desceu = [e.clientX, e.clientY]);
+render.domElement.addEventListener('pointerup', e => {
+  if (!desceu || Math.hypot(e.clientX - desceu[0], e.clientY - desceu[1]) > 5) return;
+  const o = alvo(e); selecionado = o; o ? mostraInfo(o) : ($('#info').style.display = 'none');
+});
+let movePend = null;
+render.domElement.addEventListener('pointermove', e => { movePend = e; });
+function trataMove(e) {
+  if (e.buttons) { $('#dica').style.display = 'none'; return; }
+  const o = alvo(e); const d = $('#dica');
+  if (o) { d.textContent = descreve(o).titulo; d.style.left = e.clientX + 12 + 'px'; d.style.top = e.clientY + 12 + 'px'; d.style.display = 'block'; render.domElement.style.cursor = 'pointer'; }
+  else { d.style.display = 'none'; render.domElement.style.cursor = ''; }
+}
+const fmtH = m => m == null ? '—' : m < 1 ? 'agora' : m < 60 ? `há ${Math.round(m)} min` : `há ${(m / 60).toFixed(1)} h`;
+const G = p => CFG.grafana ? `${CFG.grafana}/d/${p}` : null;
+function descreve(o) {
+  const nm = o.nome.trim(); const E = estado || { mesas: {}, janelas: {}, daikin: {}, hobo: {} };
+  if (o.tipo === 'IFCFURNITURE' && /^Mesa \d\d$/.test(nm)) {
+    const e = E.mesas[nm.slice(5)] || {};
+    return { titulo: nm, linhas: [['PC', e.ocupada ? 'em execução' : 'parado'], ['Última informação', fmtH(e.idade_min)]], link: G('labeee-presenca') };
+  }
+  if ((o.tipo === 'IFCWINDOW' && nm && !/fixa$/.test(nm)) || (o.tipo === 'IFCDOOR' && nm)) {
+    const e = E.janelas[nm] || {};
+    const est = !E.janelas[nm] ? 'sem sensor' : (!e.disponivel || velho(e)) ? 'sensor sem sinal' : e.aberta ? 'aberta' : 'fechada';
+    return { titulo: (o.tipo === 'IFCDOOR' ? 'Porta ' : 'Janela ') + nm, linhas: [['Estado', est], ['Bateria', e.bateria != null ? e.bateria + ' %' : '—'], ['Última informação', fmtH(e.idade_min)]], link: G('ad8ksnn') };
+  }
+  if (o.tipo === 'IFCSENSOR') {
+    const e = E.hobo[nm] || {}; const co2 = nm.startsWith('20590');
+    const l = [['Temperatura', e.temp_c != null ? e.temp_c.toFixed(1) + ' °C' : '—'], ['Umidade', e.ur_pct != null ? e.ur_pct.toFixed(0) + ' %' : '—']];
+    if (co2) l.push(['CO₂', e.co2_ppm != null ? Math.round(e.co2_ppm) + ' ppm' : '—']);
+    l.push(['Última leitura', fmtH(e.idade_min)]);
+    return { titulo: 'HOBO ' + nm + (co2 ? ' (MX1102)' : ' (MX1101)'), linhas: l, link: G('adcfkt2') };
+  }
+  if (o.tipo === 'IFCUNITARYEQUIPMENT') {
+    const e = E.daikin[nm.replace('Daikin ', '')] || {};
+    return { titulo: nm, linhas: [['Estado', e.ligado ? 'ligado' : 'desligado'], ['Modo', e.modo || '—'], ['Setpoint', e.setpoint != null ? e.setpoint + ' °C' : '—'], ['Temp. de retorno', e.temp_retorno != null ? e.temp_retorno.toFixed(1) + ' °C' : '—'], ['Última informação', fmtH(e.idade_min)]], link: G('labeee-daikin') };
+  }
+  return null;
+}
+function mostraInfo(o) {
+  const d = descreve(o); if (!d) return;
+  $('#info').innerHTML = `<span class="x" id="fecha">✕</span><h2>${d.titulo}</h2><table>${d.linhas.map(([a, b]) => `<tr><td>${a}</td><td>${b}</td></tr>`).join('')}</table>${d.link ? `<p style="margin:8px 0 0"><a href="${d.link}" target="_blank" rel="noopener">Ver o histórico no Grafana ↗</a></p>` : ''}`;
+  $('#info').style.display = 'block';
+  $('#fecha').onclick = () => { selecionado = null; $('#info').style.display = 'none'; };
+}
+
+// ------------------------------------------------------------------ botões
+function alterna(btn, fn) { btn.onclick = () => { const v = btn.getAttribute('aria-pressed') !== 'true'; btn.setAttribute('aria-pressed', v); fn(v); }; }
+$('#bTemp').onclick = () => { modo = 'temp'; $('#bTemp').setAttribute('aria-pressed', true); $('#bCo2').setAttribute('aria-pressed', false); legenda(); aplicar(); };
+$('#bCo2').onclick = () => { modo = 'co2'; $('#bCo2').setAttribute('aria-pressed', true); $('#bTemp').setAttribute('aria-pressed', false); legenda(); aplicar(); };
+$('#bVista').onclick = vistaInicial;
+legenda();
+
+(function loop() {
+  requestAnimationFrame(loop);
+  if (controles.update()) sujo = true;
+  if (movePend) { trataMove(movePend); movePend = null; }
+  if (sujo) { sujo = false; render.render(cena, camera); }
+})();
+
+carregar().then(() => { buscar(); setInterval(buscar, CFG.intervalo); window.__gemeo = { objetos, porNome, cena, camera, render }; })
+  .catch(e => { console.error(e); $('#erro').textContent = 'Erro ao carregar: ' + e.message; });
+</script>
+</body>
+</html>

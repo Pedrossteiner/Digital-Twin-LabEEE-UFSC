@@ -1,0 +1,665 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "links": [
+    {
+      "asDropdown": false,
+      "icon": "external link",
+      "includeVars": false,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": true,
+      "title": "Baixar dados",
+      "tooltip": "Baixar estes dados em Excel ou CSV",
+      "type": "link",
+      "url": "http://localhost:8090/"
+    },
+    {
+      "asDropdown": false,
+      "icon": "external link",
+      "includeVars": false,
+      "keepTime": false,
+      "tags": [],
+      "targetBlank": true,
+      "title": "Gêmeo 3D",
+      "tooltip": "Modelo 3D do lab com os sensores ao vivo",
+      "type": "link",
+      "url": "http://localhost:8090/gemeo3d"
+    }
+  ],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "influxdb"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "#5794F2",
+            "mode": "fixed"
+          },
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#5794F2",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "none"
+        }
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value",
+        "wideLayout": true
+      },
+      "pluginVersion": "13.2.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb"
+          },
+          "query": "from(bucket: \"LabEEE\")\n  |> range(start: -1h)\n  |> filter(fn: (r) => r._measurement == \"daikin\" and r._field == \"ligado\")\n  |> last()\n  |> group()\n  |> sum()",
+          "refId": "A"
+        }
+      ],
+      "title": "Ares-condicionados ligados agora",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "influxdb"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "center",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "footer": {
+              "reducers": []
+            },
+            "inspect": false
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Estado"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "0": {
+                        "color": "#6e7581",
+                        "index": 0,
+                        "text": "Desligado"
+                      },
+                      "1": {
+                        "color": "#5794F2",
+                        "index": 1,
+                        "text": "Ligado"
+                      }
+                    },
+                    "type": "value"
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "mode": "basic",
+                  "type": "color-background"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "Setpoint|Temp. de retorno"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "celsius"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Filtro"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "0": {
+                        "color": "green",
+                        "index": 0,
+                        "text": "OK"
+                      },
+                      "1": {
+                        "color": "orange",
+                        "index": 1,
+                        "text": "Limpar filtro"
+                      }
+                    },
+                    "type": "value"
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Local"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 220
+              },
+              {
+                "id": "custom.align",
+                "value": "left"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Unidade"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 100
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 18,
+        "x": 6,
+        "y": 0
+      },
+      "id": 2,
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true
+      },
+      "pluginVersion": "13.2.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb"
+          },
+          "query": "import \"strings\"\n// Estado atual de cada ar-condicionado (o HA publica a cada 10 min e a cada mudança)\nfrom(bucket: \"LabEEE\")\n  |> range(start: -1h)\n  |> filter(fn: (r) => r._measurement == \"daikin\")\n  |> last()\n  |> map(fn: (r) => ({r with _value: string(v: r._value)}))\n  |> map(fn: (r) => ({r with local:\n      if r.unidade == \"1_02\" then \"Salão · mesas 51–54/61–64\"\n      else if r.unidade == \"1_03\" then \"Salão · mesas 31–34/41–44\"\n      else if r.unidade == \"1_04\" then \"Salão · mesas 11–14/21–24\"\n      else if r.unidade == \"1_05\" then \"Salão · mesas 35–37/45–47\"\n      else if r.unidade == \"1_06\" then \"Salão · mesas 15–17/25–27\"\n      else if r.unidade == \"1_00\" then \"Reunião 1\"\n      else if r.unidade == \"1_01\" then \"Reunião 2\"\n      else if r.unidade == \"1_07\" then \"Sala da Ana Paula\"\n      else if r.unidade == \"1_08\" then \"Sala do Lamberts\"\n      else \"?\"}))\n  |> map(fn: (r) => ({r with unidade: \"Daikin \" + strings.replaceAll(v: r.unidade, t: \"_\", u: \"-\")}))\n  |> group()\n  |> pivot(rowKey: [\"unidade\", \"local\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> keep(columns: [\"unidade\", \"local\", \"ligado\", \"modo\", \"setpoint\", \"temp_retorno\", \"ventilador\", \"filtro_sujo\"])\n  |> sort(columns: [\"unidade\"])",
+          "refId": "A"
+        }
+      ],
+      "title": "Estado atual dos ares-condicionados",
+      "transformations": [
+        {
+          "id": "convertFieldType",
+          "options": {
+            "conversions": [
+              {
+                "destinationType": "number",
+                "targetField": "ligado"
+              },
+              {
+                "destinationType": "number",
+                "targetField": "setpoint"
+              },
+              {
+                "destinationType": "number",
+                "targetField": "temp_retorno"
+              },
+              {
+                "destinationType": "number",
+                "targetField": "filtro_sujo"
+              }
+            ]
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "indexByName": {
+              "filtro_sujo": 7,
+              "ligado": 2,
+              "local": 1,
+              "modo": 3,
+              "setpoint": 4,
+              "temp_retorno": 5,
+              "unidade": 0,
+              "ventilador": 6
+            },
+            "renameByName": {
+              "filtro_sujo": "Filtro",
+              "ligado": "Estado",
+              "local": "Local",
+              "modo": "Modo",
+              "setpoint": "Setpoint",
+              "temp_retorno": "Temp. de retorno",
+              "unidade": "Unidade",
+              "ventilador": "Ventilador"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 0,
+        "y": 5
+      },
+      "id": 3,
+      "options": {
+        "code": {
+          "language": "plaintext",
+          "showLineNumbers": false,
+          "showMiniMap": false
+        },
+        "content": "9 ares-condicionados Daikin (rede DIII-Net, integração **daikin_d3net** no Home Assistant). A automação **Publicar Daikin no MQTT** manda o estado para `lab/daikin/<unidade>` a cada 10 min e a cada mudança.\n\n*Temp. de retorno*: medida pelo próprio ar-condicionado, no ar que volta para ele.",
+        "mode": "markdown"
+      },
+      "pluginVersion": "13.2.1",
+      "targets": [],
+      "title": "Sobre",
+      "type": "text"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "influxdb"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "fillOpacity": 70,
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineWidth": 0,
+            "spanNulls": false
+          },
+          "displayName": "${__field.labels.unidade}",
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "color": "#6e7581",
+                  "index": 0,
+                  "text": "Desligado"
+                },
+                "1": {
+                  "color": "#5794F2",
+                  "index": 1,
+                  "text": "Ligado"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#6e7581",
+                "value": 0
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 10
+      },
+      "id": 4,
+      "options": {
+        "alignValue": "left",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "mergeValues": true,
+        "rowHeight": 0.8,
+        "showValue": "never",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "13.2.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb"
+          },
+          "query": "import \"strings\"\nfrom(bucket: \"LabEEE\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"daikin\" and r._field == \"ligado\")\n  |> map(fn: (r) => ({r with unidade: \"Daikin \" + strings.replaceAll(v: r.unidade, t: \"_\", u: \"-\")}))\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: false)\n  |> keep(columns: [\"_time\", \"_value\", \"unidade\"])",
+          "refId": "A"
+        }
+      ],
+      "title": "Ligado / desligado",
+      "type": "state-timeline"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "influxdb"
+      },
+      "description": "Temperatura do ar que volta para cada ar-condicionado, medida pelo próprio aparelho.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 1,
+          "displayName": "${__field.labels.unidade}",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "celsius"
+        }
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 19
+      },
+      "id": 5,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "13.2.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb"
+          },
+          "query": "import \"strings\"\nfrom(bucket: \"LabEEE\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"daikin\" and r._field == \"temp_retorno\")\n  |> map(fn: (r) => ({r with unidade: \"Daikin \" + strings.replaceAll(v: r.unidade, t: \"_\", u: \"-\")}))\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: false)\n  |> keep(columns: [\"_time\", \"_value\", \"unidade\"])",
+          "refId": "A"
+        }
+      ],
+      "title": "Temperatura de retorno",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "influxdb"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "stepAfter",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 1,
+          "displayName": "${__field.labels.unidade}",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "celsius"
+        }
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 12,
+        "y": 19
+      },
+      "id": 6,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "13.2.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "influxdb"
+          },
+          "query": "import \"strings\"\nfrom(bucket: \"LabEEE\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"daikin\" and r._field == \"setpoint\")\n  |> map(fn: (r) => ({r with unidade: \"Daikin \" + strings.replaceAll(v: r.unidade, t: \"_\", u: \"-\")}))\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: false)\n  |> keep(columns: [\"_time\", \"_value\", \"unidade\"])",
+          "refId": "A"
+        }
+      ],
+      "title": "Setpoint",
+      "type": "timeseries"
+    }
+  ],
+  "preload": false,
+  "refresh": "30s",
+  "schemaVersion": 42,
+  "tags": [
+    "gemeo-digital",
+    "labeee"
+  ],
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": [
+      "5s",
+      "10s",
+      "30s",
+      "1m",
+      "5m",
+      "15m",
+      "30m",
+      "1h",
+      "2h",
+      "1d"
+    ]
+  },
+  "timezone": "browser",
+  "title": "LabEEE — Ar-condicionado",
+  "uid": "labeee-daikin"
+}

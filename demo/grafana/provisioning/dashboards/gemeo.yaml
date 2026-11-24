@@ -1,0 +1,7 @@
+apiVersion: 1
+providers:
+  - name: Gêmeo Digital
+    folder: LabEEE
+    type: file
+    options:
+      path: /var/lib/grafana/dashboards
