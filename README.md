@@ -107,7 +107,7 @@ Sou **Pedro Santana Steiner**, estudante de Engenharia de Controle e Automação
 
 O modelo BIM do laboratório foi feito pelo LabEEE; aqui ele recebeu os nomes que ligam cada objeto ao seu sensor.
 
-O desenvolvimento contou com apoio de IA (Claude, da Anthropic) na programação e na documentação; a definição do que construir, as decisões de projeto, a validação no laboratório e a operação do sistema ficaram comigo.
+Desenvolvido com apoio de IA (Claude, da Anthropic).
 
 ## Licença
 
