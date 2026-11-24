@@ -16,8 +16,8 @@ O CSV do Grafana não serve para pesquisa: formato diferente em cada painel, pre
 
 O login é o mesmo do Grafana: o portal pergunta ao Grafana quem é o dono do cookie de sessão, sem segundo cadastro.
 
-## 4. Gêmeo 3D: o modelo é "cozido" no build
-O modelo BIM do lab tem 304 sólidos com superfícies NURBS (cadeiras, divisórias). No navegador, o web-ifc levava **~60 s** para transformá-los em triângulos e gerava **8,9 milhões** de triângulos (8,5 milhões só nas 36 cadeiras). A página travava.
+## 4. Gêmeo 3D: pré-processamento do modelo no build
+O modelo BIM do laboratório tem 304 sólidos com superfícies NURBS (cadeiras, divisórias). No navegador, o web-ifc levava **~60 s** para transformá-los em triângulos e gerava **8,9 milhões** de triângulos (8,5 milhões só nas 36 cadeiras), o que tornava a página inutilizável.
 
 Solução, em `portal-dados/app/static/cozinhar.mjs` (o mesmo código roda no Node e no navegador):
 1. geometria repetida (as 36 cadeiras são a mesma) é lida uma vez só;
@@ -25,7 +25,7 @@ Solução, em `portal-dados/app/static/cozinhar.mjs` (o mesmo código roda no No
 3. tudo o que não muda de cor vira uma malha por material: de 3.442 para ~250 chamadas de desenho;
 4. o resultado vai para um binário compacto (`.bin.gz`), gerado numa etapa Node do `Dockerfile`.
 
-Resultado: **~430 mil triângulos e ~0,1 s para abrir**. A tela só é redesenhada quando algo muda, e o mouse só testa objetos com sensor.
+Resultado: **~430 mil triângulos e carregamento em menos de 1 s**. A tela só é redesenhada quando algo muda, e o mouse só testa objetos com sensor.
 
 O IFC continua sendo a fonte. Cada objeto é ligado ao sensor pelo **nome** (`Mesa 11`, `3A`, número de série do HOBO, `Daikin 1-04`). Trocar o modelo é substituir o arquivo e refazer o build.
 

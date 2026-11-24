@@ -133,7 +133,7 @@ async function baixar(url, p0, p1) {
 async function pacoteDoIFC() {
   $('#msg').textContent = 'Lendo o IFC direto (primeira vez pode levar 1–2 min)…';
   const dados = await baixar(CFG.ifc, 0, 40);
-  if (!dados) throw new Error('Modelo 3D não encontrado no servidor (veja portal-dados/modelo/LEIAME.md)');
+  if (!dados) throw new Error('Modelo 3D não encontrado no servidor (veja portal-dados/modelo/README.md)');
   const WebIFC = await import('web-ifc');
   const api = new WebIFC.IfcAPI();
   api.SetWasmPath(new URL('static/vendor/', location.href).href, true);
